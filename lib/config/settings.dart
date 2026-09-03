@@ -119,6 +119,12 @@ class Settings {
     return b.replace(scheme: b.scheme == 'https' ? 'wss' : 'ws', path: '/api/websocket');
   }
 
-  /// entity_picture and friends are relative to HA.
-  String resolve(String path) => path.startsWith('/') ? base.replace(path: path).toString() : path;
+  /// entity_picture and friends are relative to HA. Plain concatenation, not
+  /// Uri.replace(path:), which would encode the `?` in
+  /// `/api/media_player_proxy/x?token=…` and 404 every album cover.
+  String resolve(String path) {
+    if (!path.startsWith('/')) return path;
+    final b = base;
+    return '${b.scheme}://${b.authority}$path';
+  }
 }
