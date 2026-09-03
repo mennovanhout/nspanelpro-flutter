@@ -237,6 +237,7 @@ device with the name from step 5, and these entities:
 - **Screensaver** — a binary sensor for whether the wallpaper is showing, and a switch to put
   the panel to sleep or wake it from an automation
 - **Page** (which page is showing; set it to turn the page), **Screen brightness**, **Volume**
+- **App** — an update entity: the installed and latest version, and Install (step 9)
 - **Announce** — a notify entity: `notify.send_message` with text speaks it through your HA
   TTS engine; `sound:doorbell` (one of twenty built-in sounds - `alarm`, `laundry`, `armed`,
   `knock`, `timer`... the README lists them), a URL, a `/local/...` path or a
@@ -296,14 +297,29 @@ approach, watch the number as you walk up and set `proximity_delta` or an absolu
 
 ### 8. Starting on boot
 
-Today the app has to be started: a tap on its icon, or from your desk:
+Nothing to do: once it has been opened once, the app comes back on its own after a power cut
+and after it updates itself, and it keeps the screen on while it runs. If you want it to be
+the panel's home screen too, so nothing else can ever be in front of it:
 
 ```bash
-adb -s 10.0.0.50:5555 shell monkey -p nl.mennovanhout.nspanel -c android.intent.category.LAUNCHER 1
+adb -s 10.0.0.50:5555 shell pm enable nl.mennovanhout.nspanel/nl.mennovanhout.nspanel_app.Home
+adb -s 10.0.0.50:5555 shell cmd package set-home-activity nl.mennovanhout.nspanel/nl.mennovanhout.nspanel_app.Home
 ```
 
-It stays up indefinitely and keeps the screen on, but after a power cut you start it again.
-Automatic start on boot is on the list.
+### 9. Updating
+
+The panel's device in Home Assistant has an **update** entity. When a new release is on
+GitHub it shows "0.3.0 available" with the release notes and an **Install** button; press it
+and the panel downloads the APK and installs it itself - the app disappears for about ten
+seconds and comes back on the new version. No adb, nobody at the panel, and four panels are
+four presses or one automation. The setup screen (two-finger hold) shows the same, with an
+Update button of its own.
+
+It works because the NSPanel Pro's own adb daemon accepts connections from the panel itself
+without a key, so the app can run `pm install` on itself. If a panel says "Install failed ...
+INSTALL_FAILED_UPDATE_INCOMPATIBLE", the app on it was built with a different signing key
+than the release - the README's "Updating" section explains; the fix is one uninstall and
+a fresh install, then it updates itself from then on.
 
 ---
 

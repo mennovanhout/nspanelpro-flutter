@@ -59,6 +59,32 @@ class Device {
   }
 
   /// 0..100 of the media stream, which is what the speaker plays on.
+  static Future<bool> hasVibrator() async {
+    try {
+      return await _m.invokeMethod<bool>('hasVibrator') ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// A short buzz, straight to the motor (bypasses the system haptics toggle).
+  static Future<void> vibrate([int ms = 15]) async {
+    try {
+      await _m.invokeMethod<bool>('vibrate', ms);
+    } catch (_) {
+      // no motor, or no permission
+    }
+  }
+
+  /// The touch click, from a SoundPool so it lands within the touch's frame.
+  static Future<bool> tick([double volume = 0.5]) async {
+    try {
+      return await _m.invokeMethod<bool>('tick', volume) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<int?> volume() async {
     try {
       return await _m.invokeMethod<int>('getVolume');

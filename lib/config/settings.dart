@@ -17,6 +17,7 @@ class Settings {
     this.mqtt,
     this.name = 'NSPanel',
     this.ttsEngine = '',
+    this.feedback,
   });
 
   String url;
@@ -34,6 +35,13 @@ class Settings {
 
   /// e.g. tts.google_en_com; empty = whichever engine HA lists first.
   String ttsEngine;
+
+  /// Touch feedback: {sound: true, vibrate: true, volume: 0.5}. Null = all on.
+  Map<String, dynamic>? feedback;
+
+  bool get touchSound => feedback?['sound'] is bool ? feedback!['sound'] as bool : true;
+  bool get touchVibrate => feedback?['vibrate'] is bool ? feedback!['vibrate'] as bool : true;
+  double get touchVolume => ((feedback?['volume'] as num?)?.toDouble() ?? 0.5).clamp(0.0, 1.0);
 
   String get mqttHost => mqtt?['host']?.toString().trim() ?? '';
   int get mqttPort => (mqtt?['port'] as num?)?.toInt() ?? 1883;
@@ -56,6 +64,7 @@ class Settings {
   static const _kMqtt = 'mqtt';
   static const _kName = 'name';
   static const _kTts = 'tts_engine';
+  static const _kFeedback = 'feedback';
 
   static Map<String, dynamic>? _map(SharedPreferences p, String key) {
     final raw = p.getString(key);
@@ -107,6 +116,9 @@ class Settings {
             : current?.mqtt,
         name: j['name']?.toString().trim() ?? current?.name ?? 'NSPanel',
         ttsEngine: j['tts_engine']?.toString().trim() ?? current?.ttsEngine ?? '',
+        feedback: j.containsKey('feedback')
+            ? (j['feedback'] is Map ? (j['feedback'] as Map).cast<String, dynamic>() : null)
+            : current?.feedback,
       );
       await s.save();
       return true;
@@ -130,6 +142,7 @@ class Settings {
       mqtt: _map(p, _kMqtt),
       name: p.getString(_kName) ?? 'NSPanel',
       ttsEngine: p.getString(_kTts) ?? '',
+      feedback: _map(p, _kFeedback),
     );
   }
 
@@ -140,7 +153,7 @@ class Settings {
     await p.setString(_kDash, dashboard);
     await p.setString(_kName, name);
     await p.setString(_kTts, ttsEngine);
-    for (final e in {_kSaver: screensaver, _kMqtt: mqtt}.entries) {
+    for (final e in {_kSaver: screensaver, _kMqtt: mqtt, _kFeedback: feedback}.entries) {
       if (e.value == null) {
         await p.remove(e.key);
       } else {

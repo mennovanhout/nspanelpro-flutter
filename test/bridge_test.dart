@@ -192,4 +192,31 @@ void main() {
     expect(broker.published['nspanel/abc123/screensaver'], 'ON');
     expect(broker.published['nspanel/abc123/page'], '1');
   });
+
+  test('the update entity: state JSON and the install command', () async {
+    final broker = _Broker();
+    final mqtt = MqttClient(transportFactory: () async => broker, clientId: 'c');
+    var installs = 0;
+    final b = PanelBridge(mqtt: mqtt, deviceId: 'd1', name: 'P', version: '0.2.0', onInstall: () => installs++);
+    b.start();
+    await pumpEventQueue();
+    final cfg = jsonDecode(broker.published['homeassistant/update/d1/app/config']!) as Map;
+    expect(cfg['payload_install'], 'install');
+    expect(cfg['command_topic'], 'nspanel/d1/update/set');
+    expect(cfg['device_class'], 'firmware');
+    b.updateState(installed: '0.2.0', latest: '0.3.0', url: 'https://r', notes: 'Alarm card');
+    await pumpEventQueue();
+    final st = jsonDecode(broker.published['nspanel/d1/update']!) as Map;
+    expect(st['installed_version'], '0.2.0');
+    expect(st['latest_version'], '0.3.0');
+    expect(st['release_url'], 'https://r');
+    expect(st['in_progress'], false);
+    b.updateState(installed: '0.2.0', latest: '0.3.0', inProgress: true, percent: 40);
+    await pumpEventQueue();
+    expect((jsonDecode(broker.published['nspanel/d1/update']!) as Map)['update_percentage'], 40);
+    broker.deliver('nspanel/d1/update/set', 'install');
+    await pumpEventQueue();
+    expect(installs, 1);
+    mqtt.dispose();
+  });
 }

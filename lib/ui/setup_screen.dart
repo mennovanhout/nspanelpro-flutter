@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 
 import '../config/settings.dart';
+import '../update/updater.dart';
 import '../util/proximity.dart';
 import 'theme.dart';
 
 /// Where is Home Assistant, and who are we. Shown once, and again on a
-/// rejected token or a triple-tap in the top-left corner.
+/// rejected token or a two-finger hold on the dashboard.
 class SetupScreen extends StatefulWidget {
-  const SetupScreen({super.key, this.initial, this.message, required this.onSaved});
+  const SetupScreen({super.key, this.initial, this.message, this.updater, required this.onSaved});
   final Settings? initial;
   final String? message;
+  final Updater? updater;
   final ValueChanged<Settings> onSaved;
 
   @override
@@ -165,9 +167,59 @@ class _SetupScreenState extends State<SetupScreen> {
                 style: const TextStyle(color: Ns.muted, fontSize: 13, fontFeatures: Ns.tabular),
               ),
             ),
+            if (widget.updater != null) ...[
+              const SizedBox(height: 10),
+              _UpdateRow(updater: widget.updater!),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+/// The installed version, what GitHub has, and a button when they differ.
+/// The same install HA's update entity triggers, reachable from the panel.
+class _UpdateRow extends StatelessWidget {
+  const _UpdateRow({required this.updater});
+  final Updater updater;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: Listenable.merge([updater.latest, updater.progress, updater.status]),
+        builder: (context, _) {
+          final busy = updater.progress.value != null;
+          final status = updater.status.value;
+          return Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'App ${updater.installed}${status.isEmpty ? '' : ' · $status'}'
+                  '${busy ? ' ${updater.progress.value}%' : ''}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Ns.muted, fontSize: 13, fontFeatures: Ns.tabular),
+                ),
+              ),
+              const SizedBox(width: 10),
+              if (updater.updateAvailable && !busy)
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Ns.mint,
+                    foregroundColor: Ns.ground,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                  ),
+                  onPressed: () => updater.install(),
+                  child: Text('Update to ${updater.latest.value!.version}'),
+                )
+              else if (!busy)
+                TextButton(
+                  onPressed: () => updater.check(),
+                  child: const Text('Check for updates', style: TextStyle(color: Ns.muted, fontSize: 13)),
+                ),
+            ],
+          );
+        },
+      );
 }

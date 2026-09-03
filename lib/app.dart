@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import 'audio/announcer.dart';
 import 'cards/env.dart';
@@ -22,11 +24,12 @@ import 'ui/screensaver.dart';
 import 'ui/setup_screen.dart';
 import 'ui/theme.dart';
 import 'ui/warmup.dart';
+import 'update/updater.dart';
 import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.2.0';
+const appVersion = '0.3.0';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});
@@ -53,6 +56,7 @@ class _ShellState extends State<Shell> {
   bool _loaded = false;
   bool _showSetup = false;
   String? _setupMessage;
+  Updater? _updater;
 
   @override
   void initState() {
@@ -61,11 +65,14 @@ class _ShellState extends State<Shell> {
     // `--ez setup true` launch extra opens the setup screen, for adb.
     Settings.consumeSetupFile()
         .then((_) => Settings.load())
-        .then((s) async => (s, await Device.wantsSetup()))
+        .then((s) async => (s, await Device.wantsSetup(), await getExternalStorageDirectory()))
         .then((r) => setState(() {
               _settings = r.$1;
               _showSetup = r.$2;
               _loaded = true;
+              // the app's own files dir: where setup.json goes, and where the
+              // update APK lands (the panel's shell user can read it there)
+              _updater = Updater(installed: appVersion, dir: r.$3 ?? Directory.systemTemp);
             }));
   }
 
@@ -79,6 +86,7 @@ class _ShellState extends State<Shell> {
         key: const ValueKey('setup'),
         initial: _settings,
         message: _setupMessage,
+        updater: _updater,
         onSaved: (s) => setState(() {
           _settings = s;
           _showSetup = false;
@@ -89,6 +97,7 @@ class _ShellState extends State<Shell> {
       child = Dashboard(
         key: ValueKey('dash|${_settings!.url}|${_settings!.token.hashCode}|${_settings!.dashboard}'),
         settings: _settings!,
+        updater: _updater!,
         onReconfigure: (msg) => setState(() {
           _showSetup = true;
           _setupMessage = msg;
@@ -101,8 +110,9 @@ class _ShellState extends State<Shell> {
 }
 
 class Dashboard extends StatefulWidget {
-  const Dashboard({super.key, required this.settings, required this.onReconfigure});
+  const Dashboard({super.key, required this.settings, required this.updater, required this.onReconfigure});
   final Settings settings;
+  final Updater updater;
   final ValueChanged<String?> onReconfigure;
 
   @override
@@ -139,12 +149,16 @@ class _DashboardState extends State<Dashboard> {
   void initState() {
     super.initState();
     _frames.start();
+    Device.hasVibrator().then((v) {
+      _hasVibrator = v;
+      debugPrint('touch: vibrator ${v ? 'present' : 'absent'}, sound ${widget.settings.touchSound ? 'on' : 'off'}');
+    });
     _conn = HaConnection(
       transportFactory: () => WebSocketTransport.connect(widget.settings.wsUri),
       token: widget.settings.token,
       states: _states,
     );
-    _env = PanelEnv(states: _states, conn: _conn, settings: widget.settings);
+    _env = PanelEnv(states: _states, conn: _conn, settings: widget.settings, play: (ref) => _announcer.play(ref));
 
     // Draw the last known dashboard immediately; HA's answer replaces it.
     final cached = widget.settings.cachedConfig;
@@ -180,6 +194,7 @@ class _DashboardState extends State<Dashboard> {
   final _pageJump = ValueNotifier<int>(0);
   StreamSubscription<double>? _proxAlways, _lightSub;
   Timer? _diag;
+  Timer? _updateCheck;
 
   Future<void> _startBridge() async {
     final s = widget.settings;
@@ -212,8 +227,19 @@ class _DashboardState extends State<Dashboard> {
       onPlay: _announcer.play,
       onStop: _announcer.stop,
       onWake: _wake,
+      onInstall: () => widget.updater.install(),
     );
     _bridge = b;
+    // the update entity follows the updater; the first check is half a
+    // minute after start so it never competes with the dashboard loading
+    for (final n in [widget.updater.latest, widget.updater.progress, widget.updater.status]) {
+      n.addListener(_publishUpdate);
+    }
+    _updateCheck?.cancel();
+    _updateCheck = Timer(const Duration(seconds: 30), () {
+      widget.updater.check();
+      _updateCheck = Timer.periodic(const Duration(hours: 6), (_) => widget.updater.check());
+    });
     _mqtt!.connected.addListener(() {
       debugPrint('mqtt: ${_mqtt!.connected.value ? 'connected, device announced' : 'disconnected'}');
     });
@@ -250,10 +276,25 @@ class _DashboardState extends State<Dashboard> {
         ],
       );
 
+  void _publishUpdate() {
+    final u = widget.updater;
+    final l = u.latest.value;
+    _bridge?.updateState(
+      installed: u.installed,
+      latest: l?.version,
+      url: l?.url,
+      notes: l?.notes,
+      inProgress: u.progress.value != null,
+      percent: u.progress.value,
+    );
+    if (u.status.value.isNotEmpty) debugPrint('update: ${u.status.value}');
+  }
+
   Future<void> _publishDiagnostics() async {
     final b = _bridge;
     if (b == null) return;
     b.slowFrames(_frames.slow.value);
+    _publishUpdate();
     final rssi = await Device.wifiRssi();
     if (rssi != null) b.rssi(rssi);
     final t = await Device.socTemperature();
@@ -269,6 +310,10 @@ class _DashboardState extends State<Dashboard> {
     _hold?.cancel();
     _diag?.cancel();
     _warmTimer?.cancel();
+    _updateCheck?.cancel();
+    for (final n in [widget.updater.latest, widget.updater.progress, widget.updater.status]) {
+      n.removeListener(_publishUpdate);
+    }
     _proxAlways?.cancel();
     _lightSub?.cancel();
     _mqtt?.dispose();
@@ -386,6 +431,26 @@ class _DashboardState extends State<Dashboard> {
     _armIdle();
   }
 
+  /// Every touch-down clicks and, when the panel has a motor, buzzes -
+  /// fired here, at the touch, not when a card decides what it meant, so
+  /// the feedback is within the same frame as the finger.
+  void _feedback() {
+    final s = widget.settings;
+    if (s.touchSound) {
+      Device.tick(s.touchVolume).then((ok) {
+        if (_tickLogged < 2) {
+          _tickLogged++;
+          debugPrint('touch: click sound ${ok ? 'playing' : 'not loaded yet'}');
+        }
+      });
+    }
+    if (s.touchVibrate && _hasVibrator) Device.vibrate(12);
+  }
+
+  int _tickLogged = 0;
+
+  bool _hasVibrator = false;
+
   // _saving is the target state; _saverMounted keeps the overlay in the tree
   // while it fades out, so the dashboard is touchable the moment it starts.
   bool _saverMounted = false;
@@ -449,6 +514,7 @@ class _DashboardState extends State<Dashboard> {
       body: Listener(
         onPointerDown: (e) {
           _touched();
+          _feedback();
           _pointerDown(e);
         },
         onPointerMove: (e) {

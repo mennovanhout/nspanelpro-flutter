@@ -53,6 +53,10 @@ views:
 Every card and option is documented in the cards repo's README; this app takes the same ones.
 Heights are in logical pixels, which on the panel at stock density are the panel's pixels.
 
+The alarm card is the one with a keypad: when the alarm wants a code, arming or disarming
+opens one full screen, and a refused code says so and clears. It rings the built-in
+`armed`, `disarmed` and `alarm` sounds as the state changes (`sounds: false` to stop it).
+
 `vertical-stack`, `horizontal-stack` and `grid` are rendered as layout, nested as deep as you
 like. In a horizontal stack every child is an equal column and keeps its own `height`, so give
 them the same one. `grid` takes `columns`; `square` is ignored.
@@ -142,7 +146,56 @@ The app reads it once, saves the settings, and deletes the file. Delete `setup.j
 computer too; it has your token in it. A later file is a **partial** update — only the keys in
 it change — which is how you re-point a panel at a different dashboard, or adjust its
 screensaver, from your desk without re-entering the token. The full set of keys is `url`,
-`token`, `dashboard`, `name`, `mqtt`, `tts_engine` and `screensaver`.
+`token`, `dashboard`, `name`, `mqtt`, `tts_engine`, `screensaver` and `feedback`.
+
+### Touch feedback
+
+Every touch-down clicks, and buzzes if the panel has a motor. The click is the built-in
+`pop` through a SoundPool, the one Android path that plays within the touch's own frame
+(a media player takes a tenth of a second to start, which reads as lag, not feedback). Both
+are on by default; turn either off or set the click's volume in `setup.json`:
+
+```json
+{ "feedback": { "sound": true, "vibrate": true, "volume": 0.5 } }
+```
+
+### Start on boot
+
+The app comes back up by itself after a power cut, and after it has updated itself. Nothing
+to enable. If you also want it to be the panel's home screen, so nothing else ever shows
+and a stray Home press lands on the dashboard, there is a disabled `Home` alias you can
+switch on from your desk:
+
+```bash
+adb shell pm enable nl.mennovanhout.nspanel/nl.mennovanhout.nspanel_app.Home
+adb shell cmd package set-home-activity nl.mennovanhout.nspanel/nl.mennovanhout.nspanel_app.Home
+```
+
+The stock launcher stays installed; `set-home-activity l.l/...` (its package is `l.l`) puts
+it back.
+
+### Updating
+
+Once the panel is a Home Assistant device (next section) it has an **update entity**: HA
+shows "0.3.0 available" with the release notes and an Install button, and the panel
+downloads the APK from this repo's GitHub Releases and installs it on its own - no adb, no
+one at the panel. Four panels are four Install buttons, or one automation.
+
+How it can do that: the NSPanel Pro ships with adb listening on its own port 5555 with
+authentication off (`ro.adb.secure=0`), so the app talks the adb protocol to
+`127.0.0.1:5555` and runs `pm install -r` on itself, exactly what you would do from your
+desk. The install kills the running app; a broadcast receiver starts the new one, so from HA
+it looks like a ten-second reboot. The setup screen (two-finger hold) shows the installed
+version and has the same Update button, and the panel checks GitHub half a minute after
+start and every six hours.
+
+Releases come from a tag: `git tag v0.3.0 && git push --tags` and the `Release` workflow
+builds the APK and attaches it. **The signing key matters:** Android only installs an update
+over an app signed with the same key, so the workflow signs with the keystore in the
+repository secrets (`KEYSTORE_B64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`) and
+refuses to run without them, and a dev machine signs with the same key through
+`android/key.properties` (gitignored). An APK you build without it is signed with your
+debug key and installs fine - but a release will not install over it; uninstall first.
 
 The panel is Android 8.1; the build targets API 24 and up. On the Mali-G31 the Flutter engine
 falls back from Impeller to Skia on its own (it says so in logcat at startup, worded as an
@@ -164,6 +217,7 @@ Give the app your MQTT broker and it registers itself through MQTT discovery: on
 | `number` Screen brightness | 0–255 |
 | `number` Volume | speaker, 0–100 |
 | `notify` Announce | `notify.send_message`: text is spoken; a URL, an HA path, a media-browser file or a built-in sound is played |
+| `update` App | the installed and latest version, release notes, and Install (see Updating) |
 | `button` Stop audio | |
 | Wi-Fi signal, SoC temperature, slow frames, app version, last touch | diagnostics |
 
@@ -304,14 +358,15 @@ websocket client is a port of the one verified against a fake HA in the cards re
 tested the same way here (`flutter test`).
 
 Not here: Home Assistant's more-info dialog. Where the web cards open it, this app opens the
-card's own sheet (climate) or does nothing (read-only cards). And only these ten card types
-render; this is a panel, not a browser.
+card's own sheet (climate) or does nothing (read-only cards). And only these eleven card
+types render; this is a panel, not a browser.
 
 ## Layout
 
 ```
 lib/ha/          Home Assistant websocket, entity state with a notifier per entity
 lib/mqtt/        MQTT 3.1.1 client (hand-rolled) and the HA-discovery bridge
+lib/update/      GitHub Releases check, and an adb client for installing over 127.0.0.1:5555
 lib/audio/       the speaker: TTS via HA, URLs, media-browser files, built-in sounds
 lib/config/      settings (url, token, dashboard, mqtt, ...), Lovelace -> pages, screensaver
 lib/ui/          the shared drag surface, the long-press sheet, the pager, screensaver, setup

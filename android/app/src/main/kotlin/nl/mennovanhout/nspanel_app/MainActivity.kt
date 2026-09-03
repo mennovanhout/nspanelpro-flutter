@@ -5,7 +5,12 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.media.AudioAttributes
 import android.media.AudioManager
+import android.media.SoundPool
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.net.wifi.WifiManager
 import android.os.Bundle
 import android.provider.Settings
@@ -18,6 +23,25 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var proximityListener: SensorEventListener? = null
     private var lightListener: SensorEventListener? = null
+
+    // Touch feedback: a SoundPool click is the only thing on Android that
+    // plays within a frame of the touch (MediaPlayer/just_audio take a
+    // hundred milliseconds to start, which reads as lag, not feedback).
+    private var pool: SoundPool? = null
+    private var tickId = 0
+    private var tickReady = false
+
+    private fun loadTick() {
+        if (pool != null) return
+        val attrs = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
+        val p = SoundPool.Builder().setMaxStreams(2).setAudioAttributes(attrs).build()
+        p.setOnLoadCompleteListener { _, _, status -> tickReady = status == 0 }
+        val key = io.flutter.FlutterInjector.instance().flutterLoader().getLookupKeyForAsset("assets/sounds/pop.wav")
+        assets.openFd(key).use { fd -> tickId = p.load(fd, 1) }
+        pool = p
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,6 +71,7 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        loadTick() // ahead of the first touch, which would otherwise be silent
         val messenger = flutterEngine.dartExecutor.binaryMessenger
         val sensors = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val proximity = sensors.getDefaultSensor(Sensor.TYPE_PROXIMITY)
@@ -96,6 +121,26 @@ class MainActivity : FlutterActivity() {
                     window.attributes = lp
                     result.success(true)
                 }
+                "hasVibrator" -> {
+                    val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                    result.success(v?.hasVibrator() == true)
+                }
+                // straight to the Vibrator, not View.performHapticFeedback, which
+                // the system's "haptic feedback" toggle can silently turn off
+                "vibrate" -> {
+                    val ms = ((call.arguments as? Int) ?: 15).toLong().coerceIn(1, 200)
+                    val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                    if (v == null || !v.hasVibrator()) { result.success(false); return@setMethodCallHandler }
+                    if (Build.VERSION.SDK_INT >= 26) v.vibrate(VibrationEffect.createOneShot(ms, VibrationEffect.DEFAULT_AMPLITUDE))
+                    else @Suppress("DEPRECATION") v.vibrate(ms)
+                    result.success(true)
+                }
+                "tick" -> {
+                    loadTick()
+                    val vol = ((call.arguments as? Double) ?: 0.5).toFloat().coerceIn(0f, 1f)
+                    if (tickReady) pool?.play(tickId, vol, vol, 1, 0, 1f)
+                    result.success(tickReady)
+                }
                 "getVolume" -> {
                     val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                     val cur = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
@@ -113,6 +158,8 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        pool?.release()
+        pool = null
         val sensors = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         proximityListener?.let { sensors.unregisterListener(it) }
         lightListener?.let { sensors.unregisterListener(it) }

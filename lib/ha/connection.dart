@@ -186,7 +186,10 @@ class HaConnection {
     }
   }
 
-  Future<void> callService(String domain, String service, [Map<String, dynamic>? data]) async {
+  /// False when HA refused it (a wrong alarm code, say) or the socket is
+  /// down; the reason goes to the log. Most cards fire and forget; the alarm
+  /// card's keypad needs the answer.
+  Future<bool> callService(String domain, String service, [Map<String, dynamic>? data]) async {
     try {
       await send({
         'type': 'call_service',
@@ -194,8 +197,10 @@ class HaConnection {
         'service': service,
         'service_data': data ?? const {},
       });
+      return true;
     } catch (e) {
       debugPrint('call_service $domain.$service failed: $e');
+      return false;
     }
   }
 

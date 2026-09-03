@@ -37,6 +37,7 @@ class PanelBridge {
     this.onPlay,
     this.onStop,
     this.onWake,
+    this.onInstall,
   });
 
   final MqttClient mqtt;
@@ -53,6 +54,7 @@ class PanelBridge {
   final void Function(String)? onPlay;
   final VoidCallback? onStop;
   final VoidCallback? onWake;
+  final VoidCallback? onInstall;
 
   String get base => 'nspanel/$deviceId';
   String get availabilityTopic => '$base/availability';
@@ -133,6 +135,12 @@ class PanelBridge {
         'name': 'SoC temperature', 'device_class': 'temperature', 'unit_of_measurement': '°C',
         'state_class': 'measurement', ...diag,
       }),
+      // HA's update entity: "0.3.0 available", release notes, an Install
+      // button. The app fetches the APK from GitHub and installs it itself.
+      'update/$deviceId/app': e('update', {
+        'name': 'App', 'device_class': 'firmware', 'payload_install': 'install',
+        'icon': 'mdi:cellphone-arrow-down', 'entity_category': 'config',
+      }, command: true),
       'sensor/$deviceId/slow_frames': e('slow_frames', {
         'name': 'Slow frames', 'icon': 'mdi:speedometer-slow', 'state_class': 'total_increasing', ...diag,
       }),
@@ -157,6 +165,9 @@ class PanelBridge {
     mqtt.subscribe('$base/page/set', (_, v) => _int(v, onPage));
     mqtt.subscribe('$base/screensaver/set', (_, v) => onScreensaver?.call(v.trim().toUpperCase() == 'ON'));
     mqtt.subscribe('$base/stop/set', (_, _) => onStop?.call());
+    mqtt.subscribe('$base/update/set', (_, v) {
+      if (v.trim().toLowerCase() == 'install') onInstall?.call();
+    });
     // The notify entity sends the message text. Anything that names audio is
     // played - a URL, an HA path like /local/x.mp3, a media-source:// id from
     // HA's media browser, or a built-in `sound:doorbell` - and anything else
@@ -250,6 +261,29 @@ class PanelBridge {
   void volume(int pct) => _set('volume', pct.toString());
   void rssi(int dbm) => _set('rssi', dbm.toString());
   void slowFrames(int n) => _set('slow_frames', n.toString());
+
+  /// What the update entity shows. `latest` null means "no release known",
+  /// which HA shows as up to date with the installed version.
+  void updateState({
+    required String installed,
+    String? latest,
+    String? url,
+    String? notes,
+    bool inProgress = false,
+    int? percent,
+  }) =>
+      _set(
+          'update',
+          jsonEncode({
+            'installed_version': installed,
+            'latest_version': latest ?? installed,
+            'title': 'NSPanel app',
+            'release_url': ?url,
+            'release_summary': ?(notes == null || notes.isEmpty ? null : notes.length > 250 ? '${notes.substring(0, 250)}…' : notes),
+            'in_progress': inProgress,
+            'update_percentage': ?percent,
+          }),
+          force: true);
   void temperature(double c) => _set('soc_temperature', c.toStringAsFixed(1));
   void touched() =>
       _set('last_touch', DateTime.now().toUtc().toIso8601String(), minInterval: const Duration(seconds: 5), force: false);

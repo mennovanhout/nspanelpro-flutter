@@ -48,6 +48,14 @@ class FakeHa implements HaTransport {
         calls.add('${msg['domain']}.${msg['service']} ${jsonEncode(msg['service_data'])}');
         final data = (msg['service_data'] as Map?)?.cast<String, dynamic>() ?? const {};
         final id = data['entity_id'] as String?;
+        // an alarm panel that only takes 1234, so a refused call is testable
+        if (msg['domain'] == 'alarm_control_panel' && data['code'] != null && data['code'] != '1234') {
+          _emit({
+            'id': msg['id'], 'type': 'result', 'success': false,
+            'error': {'code': 'invalid_code', 'message': 'Invalid alarm code provided'},
+          });
+          return;
+        }
         _emit({'id': msg['id'], 'type': 'result', 'success': true, 'result': null});
         if (id != null && states[id] != null && msg['domain'] == 'light') {
           final s = states[id]!;
@@ -59,6 +67,14 @@ class FakeHa implements HaTransport {
             }
           }
           push(id);
+        }
+        if (id != null && states[id] != null && msg['domain'] == 'alarm_control_panel') {
+          final s = states[id]!;
+          s['state'] = msg['service'] == 'alarm_disarm'
+              ? 'disarmed'
+              : (msg['service'] as String).replaceFirst('alarm_arm_', 'armed_');
+          // a beat later, like a real alarm: the card's optimistic label is visible meanwhile
+          Timer(const Duration(milliseconds: 50), () => push(id));
         }
       case 'lovelace/config':
         _emit({

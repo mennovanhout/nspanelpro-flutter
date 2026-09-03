@@ -1,8 +1,22 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// The signing key. Android only installs an update over an app signed with
+// the same key, and the app updates itself from GitHub Releases, so every
+// build that is meant to land on a panel must use the project's keystore:
+// android/key.properties on a dev machine (gitignored), KEYSTORE_* in the
+// environment on CI (from the repository secrets), else the debug key -
+// which installs fine, but a release will not install over it.
+val keyProps = Properties().apply {
+    val f = rootProject.file("key.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val keystorePath = keyProps.getProperty("storeFile") ?: System.getenv("KEYSTORE_PATH")
 
 android {
     namespace = "nl.mennovanhout.nspanel_app"
@@ -29,11 +43,20 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (keystorePath != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = keyProps.getProperty("storePassword") ?: System.getenv("KEYSTORE_PASSWORD")
+                keyAlias = keyProps.getProperty("keyAlias") ?: System.getenv("KEY_ALIAS")
+                keyPassword = keyProps.getProperty("keyPassword") ?: System.getenv("KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (keystorePath != null) "release" else "debug")
         }
     }
 }

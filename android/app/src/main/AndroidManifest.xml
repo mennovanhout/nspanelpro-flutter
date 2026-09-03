@@ -7,6 +7,10 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <!-- screen brightness from HA; a one-time grant on the panel (see README) -->
     <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
+    <!-- come back up after a power cut, and after updating itself -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- touch feedback -->
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <application
         android:label="NSPanel"
         android:usesCleartextTraffic="true"
@@ -34,6 +38,27 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Optional: make the app the panel's home screen, so nothing else ever shows.
+             Disabled until you enable it (see README "Start on boot"):
+               adb shell pm enable nl.mennovanhout.nspanel/nl.mennovanhout.nspanel_app.Home
+               adb shell cmd package set-home-activity nl.mennovanhout.nspanel/nl.mennovanhout.nspanel_app.Home -->
+        <activity-alias
+            android:name=".Home"
+            android:targetActivity=".MainActivity"
+            android:enabled="false"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.HOME"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+        </activity-alias>
+        <receiver android:name=".BootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED"/>
+            </intent-filter>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../config/dashboard.dart';
 import '../ui/theme.dart';
+import 'alarm_card.dart';
 import 'button_card.dart';
 import 'climate_card.dart';
 import 'clock_card.dart';
@@ -29,6 +30,8 @@ Widget buildCard(CardConfig c, PanelEnv env) {
       return MediaCard(config: c, env: env);
     case 'nspanel-button-card':
       return ButtonCard(config: c, env: env);
+    case 'nspanel-alarm-card':
+      return AlarmCard(config: c, env: env);
     case 'nspanel-sensor-card':
       return SensorCard(config: c, env: env);
     case 'nspanel-sensors-card':
