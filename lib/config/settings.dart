@@ -90,6 +90,24 @@ class Settings {
     await p.remove(_kCache);
   }
 
+  /// The dashboard's url_path, however it was typed. People paste what the
+  /// address bar shows, and that is `/dining-area/0` - the view index on the
+  /// end, a slash on the front, sometimes the whole URL. HA wants `dining-area`.
+  String get dashboardPath => normaliseDashboard(dashboard);
+
+  static String normaliseDashboard(String raw) {
+    var s = raw.trim();
+    if (s.contains('://')) {
+      s = Uri.tryParse(s)?.path ?? s;
+    }
+    s = s.replaceAll(RegExp(r'^/+'), '');
+    // drop a trailing view segment: "/0", "/kitchen", but not the dashboard itself
+    final parts = s.split('/').where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return '';
+    if (parts.first == 'lovelace') return ''; // the default dashboard's own URL
+    return parts.first;
+  }
+
   Uri get base {
     var raw = url.trim();
     if (!raw.contains('://')) raw = 'http://$raw';
