@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../config/settings.dart';
 import '../ha/connection.dart';
+import 'sounds.dart';
 
 /// The speaker. Plays a URL, or speaks text by asking Home Assistant's own
 /// TTS engine for the audio - so the voice is whatever you configured in HA,
@@ -19,7 +20,7 @@ class Announcer {
   String? _engine;
 
   /// Plays whatever `ref` names:
-  ///   sound:doorbell          a built-in chime (doorbell, chime, alert)
+  ///   sound:doorbell          one of the built-in sounds in [kSounds]
   ///   media-source://...      a file from HA's media browser, resolved via HA
   ///   /local/x.mp3            a path on HA
   ///   https://...             any URL
@@ -27,6 +28,9 @@ class Announcer {
     try {
       if (ref.startsWith('sound:')) {
         final name = ref.substring(6).trim().toLowerCase();
+        if (!kSounds.containsKey(name)) {
+          throw ArgumentError('no such sound; the built-in ones are ${kSounds.keys.join(', ')}');
+        }
         await _player.setAsset('assets/sounds/$name.wav');
       } else {
         var url = ref;

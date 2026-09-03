@@ -238,7 +238,8 @@ device with the name from step 5, and these entities:
   the panel to sleep or wake it from an automation
 - **Page** (which page is showing; set it to turn the page), **Screen brightness**, **Volume**
 - **Announce** — a notify entity: `notify.send_message` with text speaks it through your HA
-  TTS engine; `sound:doorbell` (or `chime`, `alert`), a URL, a `/local/...` path or a
+  TTS engine; `sound:doorbell` (one of twenty built-in sounds - `alarm`, `laundry`, `armed`,
+  `knock`, `timer`... the README lists them), a URL, a `/local/...` path or a
   media-browser file is played instead. Plus a **Stop audio** button.
 - Wi-Fi signal, SoC temperature, app version, last touch, as diagnostics
 
