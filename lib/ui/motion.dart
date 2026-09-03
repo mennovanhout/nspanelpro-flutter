@@ -6,11 +6,14 @@ import 'package:flutter/material.dart';
 /// opacity/transform only - the same budget the cards keep. Nothing here
 /// runs continuously; on a Mali-G31 that is the whole discipline.
 
-/// Rises into place once, on mount. `index` staggers a list.
+/// Rises into place once, on mount. `index` staggers a list. With `animate`
+/// false it is simply there - for a page built ahead of time, off screen,
+/// so nothing has to be built in the middle of the swipe that reveals it.
 class Enter extends StatefulWidget {
-  const Enter({super.key, required this.child, this.index = 0});
+  const Enter({super.key, required this.child, this.index = 0, this.animate = true});
   final Widget child;
   final int index;
+  final bool animate;
 
   @override
   State<Enter> createState() => _EnterState();
@@ -25,6 +28,10 @@ class _EnterState extends State<Enter> with SingleTickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    if (!widget.animate) {
+      _c.value = 1;
+      return;
+    }
     _delay = Timer(Duration(milliseconds: 60 * widget.index), () {
       if (mounted) _c.forward();
     });

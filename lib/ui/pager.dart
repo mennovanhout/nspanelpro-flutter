@@ -47,6 +47,9 @@ class _PanelPagerState extends State<PanelPager> {
       children: [
         PageView.builder(
           controller: _controller,
+          // the neighbouring pages are built while this one is shown, not
+          // in the middle of the swipe that reveals them
+          allowImplicitScrolling: true,
           itemCount: widget.pages.length,
           onPageChanged: (i) {
             setState(() => _index = i);

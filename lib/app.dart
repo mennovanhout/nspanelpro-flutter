@@ -9,6 +9,7 @@ import 'cards/registry.dart';
 import 'mqtt/bridge.dart';
 import 'mqtt/client.dart';
 import 'util/device.dart';
+import 'util/frames.dart';
 import 'config/dashboard.dart';
 import 'config/screensaver.dart';
 import 'config/settings.dart';
@@ -20,6 +21,7 @@ import 'ui/pager.dart';
 import 'ui/screensaver.dart';
 import 'ui/setup_screen.dart';
 import 'ui/theme.dart';
+import 'ui/warmup.dart';
 import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
@@ -108,6 +110,10 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> {
+  final _frames = FrameWatch();
+  int _shown = 0; // the page on screen; only it animates its cards in
+  bool _warm = false;
+  Timer? _warmTimer;
   late final HaStates _states = HaStates();
   late final HaConnection _conn;
   late final PanelEnv _env;
@@ -132,6 +138,7 @@ class _DashboardState extends State<Dashboard> {
   @override
   void initState() {
     super.initState();
+    _frames.start();
     _conn = HaConnection(
       transportFactory: () => WebSocketTransport.connect(widget.settings.wsUri),
       token: widget.settings.token,
@@ -145,6 +152,7 @@ class _DashboardState extends State<Dashboard> {
       try {
         final cfg = (jsonDecode(cached) as Map).cast<String, dynamic>();
         _pages = pagesFromLovelace(cfg);
+        _scheduleWarmup();
         _saverFromDashboard = ScreensaverConfig.findInLovelace(cfg);
       } catch (_) {
         // stale or unparsable cache; the fetch will fix it
@@ -220,9 +228,32 @@ class _DashboardState extends State<Dashboard> {
     _diag = Timer.periodic(const Duration(seconds: 60), (_) => _publishDiagnostics());
   }
 
+  /// A second after the pages appear - the cards have risen into place by
+  /// then - every page is painted once, hidden, so the first swipe does not
+  /// pay for shader compilation. See [Warmup].
+  void _scheduleWarmup() {
+    _warmTimer?.cancel();
+    if (_pages.length < 2) return;
+    _warmTimer = Timer(const Duration(milliseconds: 1500), () {
+      if (mounted) setState(() => _warm = true);
+    });
+  }
+
+  Widget _page(PanelPage p, {required bool animate}) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < p.cards.length; i++) ...[
+            if (i > 0) const SizedBox(height: Ns.gap),
+            // cards rise into place, staggered, when a page first shows
+            Enter(index: i, animate: animate, child: buildCard(p.cards[i], _env)),
+          ],
+        ],
+      );
+
   Future<void> _publishDiagnostics() async {
     final b = _bridge;
     if (b == null) return;
+    b.slowFrames(_frames.slow.value);
     final rssi = await Device.wifiRssi();
     if (rssi != null) b.rssi(rssi);
     final t = await Device.socTemperature();
@@ -237,6 +268,7 @@ class _DashboardState extends State<Dashboard> {
   void dispose() {
     _hold?.cancel();
     _diag?.cancel();
+    _warmTimer?.cancel();
     _proxAlways?.cancel();
     _lightSub?.cancel();
     _mqtt?.dispose();
@@ -264,6 +296,7 @@ class _DashboardState extends State<Dashboard> {
       if (!mounted) return;
       setState(() {
         _pages = pages;
+        _scheduleWarmup();
         _saverFromDashboard = ScreensaverConfig.findInLovelace(cfg);
         _error = pages.isEmpty
             ? 'The dashboard "${path.isEmpty ? 'default' : path}" has no cards this app can '
@@ -430,19 +463,16 @@ class _DashboardState extends State<Dashboard> {
         child: Stack(
           children: [
             if (_pages.isNotEmpty)
-              PanelPager(jump: _pageJump, onPage: (i) => _bridge?.page(i), pages: [
-                for (final p in _pages)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var i = 0; i < p.cards.length; i++) ...[
-                        if (i > 0) const SizedBox(height: Ns.gap),
-                        // cards rise into place, staggered, when a page first shows
-                        Enter(index: i, child: buildCard(p.cards[i], _env)),
-                      ],
-                    ],
-                  ),
-              ])
+              PanelPager(
+                jump: _pageJump,
+                onPage: (i) {
+                  _shown = i;
+                  _bridge?.page(i);
+                },
+                pages: [
+                  for (var i = 0; i < _pages.length; i++) _page(_pages[i], animate: i == _shown),
+                ],
+              )
             else
               Center(
                 child: Padding(
@@ -451,6 +481,11 @@ class _DashboardState extends State<Dashboard> {
                       textAlign: TextAlign.center,
                       style: TextStyle(color: _error == null ? Ns.muted : Ns.danger, fontSize: 15, height: 1.4)),
                 ),
+              ),
+            if (_warm)
+              Warmup(
+                onDone: () => setState(() => _warm = false),
+                children: [for (final p in _pages) _page(p, animate: false)],
               ),
             if (_error != null && _pages.isNotEmpty)
               Positioned(

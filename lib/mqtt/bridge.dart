@@ -133,6 +133,9 @@ class PanelBridge {
         'name': 'SoC temperature', 'device_class': 'temperature', 'unit_of_measurement': '°C',
         'state_class': 'measurement', ...diag,
       }),
+      'sensor/$deviceId/slow_frames': e('slow_frames', {
+        'name': 'Slow frames', 'icon': 'mdi:speedometer-slow', 'state_class': 'total_increasing', ...diag,
+      }),
       'sensor/$deviceId/version': e('version', {'name': 'App version', 'icon': 'mdi:tag', ...diag}),
     };
   }
@@ -246,6 +249,7 @@ class PanelBridge {
   void brightness(int v) => _set('brightness', v.toString());
   void volume(int pct) => _set('volume', pct.toString());
   void rssi(int dbm) => _set('rssi', dbm.toString());
+  void slowFrames(int n) => _set('slow_frames', n.toString());
   void temperature(double c) => _set('soc_temperature', c.toStringAsFixed(1));
   void touched() =>
       _set('last_touch', DateTime.now().toUtc().toIso8601String(), minInterval: const Duration(seconds: 5), force: false);

@@ -165,7 +165,7 @@ Give the app your MQTT broker and it registers itself through MQTT discovery: on
 | `number` Volume | speaker, 0–100 |
 | `notify` Announce | `notify.send_message`: text is spoken; a URL, an HA path, a media-browser file or a built-in sound is played |
 | `button` Stop audio | |
-| Wi-Fi signal, SoC temperature, app version, last touch | diagnostics |
+| Wi-Fi signal, SoC temperature, slow frames, app version, last touch | diagnostics |
 
 Availability is an MQTT will, so the device goes unavailable the moment the panel drops off.
 
@@ -283,6 +283,16 @@ rather than popping when its bytes land.
 All of it is opacity and transform, each a one-off - the same budget the cards keep, because
 the panel is the reason this app exists. Nothing runs continuously, and nothing animates
 while you are dragging a card.
+
+**The first swipe.** Skia compiles a shader the first time a draw op reaches this GPU, and
+on the panel that was 150–270 ms per frame the first time a page was swiped in, on top of
+building the page inside the gesture. So the pages next to the one on screen are built
+ahead of time, without their entrance animation, and a second after load the app swipes
+through every page once, hidden, to spend the compile time while nothing moves. After a
+normal launch the first swipe now has no slow frame; after a fresh install, when Android's
+shader cache is empty, one survives, and the next launch is clean. The **Slow frames**
+diagnostic counts frames over 33 ms since launch, and `adb logcat -s flutter` names each
+one with its build and raster time, so lag is a number you can chart in HA.
 
 ## What carries over from the web cards, and what does not
 
