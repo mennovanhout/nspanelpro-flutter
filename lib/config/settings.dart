@@ -1,3 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Where Home Assistant is and how to prove who we are. Stored on the panel
@@ -19,6 +24,37 @@ class Settings {
   static const _kToken = 'token';
   static const _kDash = 'dashboard';
   static const _kCache = 'cached_config';
+
+  /// Provisioning without a keyboard.
+  ///
+  /// A wall panel has no comfortable way to type a 180-character token. So on
+  /// every launch the app looks for `setup.json` in its own external files
+  /// directory - writable with a plain `adb push`, no storage permission - and
+  /// if it is there, takes `url`, `token` and `dashboard` from it, saves them,
+  /// and deletes the file. The token is on the panel's flash for exactly as
+  /// long as it takes to read it once.
+  ///
+  ///   adb push setup.json /sdcard/Android/data/nl.mennovanhout.nspanel/files/setup.json
+  static Future<bool> consumeSetupFile() async {
+    try {
+      final dir = await getExternalStorageDirectory();
+      if (dir == null) return false;
+      final f = File('${dir.path}${Platform.pathSeparator}setup.json');
+      if (!await f.exists()) return false;
+      final j = jsonDecode(await f.readAsString());
+      await f.delete();
+      if (j is! Map) return false;
+      final url = j['url']?.toString().trim() ?? '';
+      final token = j['token']?.toString().trim() ?? '';
+      if (url.isEmpty || token.isEmpty) return false;
+      final s = Settings(url: url, token: token, dashboard: j['dashboard']?.toString().trim() ?? '');
+      await s.save();
+      return true;
+    } catch (e) {
+      debugPrint('setup.json: $e');
+      return false;
+    }
+  }
 
   static Future<Settings?> load() async {
     final p = await SharedPreferences.getInstance();

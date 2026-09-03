@@ -42,7 +42,8 @@ class _ShellState extends State<Shell> {
   @override
   void initState() {
     super.initState();
-    Settings.load().then((s) => setState(() {
+    // A pushed setup.json wins over whatever is stored, then is gone.
+    Settings.consumeSetupFile().then((_) => Settings.load()).then((s) => setState(() {
           _settings = s;
           _loaded = true;
         }));

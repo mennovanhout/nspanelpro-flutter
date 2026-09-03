@@ -62,6 +62,26 @@ First launch asks for the Home Assistant URL, a long-lived access token (profile
 bottom of the page), and optionally which dashboard (its `url_path`; empty for the default).
 The token is stored on the panel only. Triple-tap the top-left corner to get that screen back.
 
+### Provisioning without a keyboard
+
+A wall panel has no comfortable way to type a 180-character token, so the app also takes its
+settings from a file you push over adb. Write `setup.json` on your computer:
+
+```json
+{ "url": "http://10.0.0.2:8123", "token": "eyJ...", "dashboard": "" }
+```
+
+then push it into the app's own directory (no storage permission needed) and launch:
+
+```bash
+adb push setup.json /sdcard/Android/data/nl.mennovanhout.nspanel/files/setup.json
+adb shell monkey -p nl.mennovanhout.nspanel -c android.intent.category.LAUNCHER 1
+```
+
+The app reads it once, saves the settings, and deletes the file. Delete `setup.json` from your
+computer too; it has your token in it. Pushing a new file later replaces the stored settings,
+which is also how you re-point a panel at a different HA or dashboard from your desk.
+
 The panel is Android 8.1; the build targets API 24 and up. If you see rendering glitches on
 the Mali-G31, switch the renderer off Impeller in `AndroidManifest.xml`:
 
