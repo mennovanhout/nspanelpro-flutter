@@ -161,7 +161,10 @@ class Tile extends StatelessWidget {
       );
 }
 
-/// `columns` across, wrapping, tiles stretched to share the rows.
+/// `columns` across, wrapping, tiles stretched to share the rows. A partial
+/// last row is shared by the tiles that are in it - two buttons under
+/// `columns: 3` are two half-width buttons, not two thirds and a gap - which
+/// is what the web cards' `flex: 1 0 ...` does.
 class TileGrid extends StatelessWidget {
   const TileGrid({super.key, required this.children, required this.columns, this.stretch = false});
   final List<Widget> children;
@@ -173,9 +176,9 @@ class TileGrid extends StatelessWidget {
     final rows = <Widget>[];
     for (var i = 0; i < children.length; i += columns) {
       final cells = <Widget>[];
-      for (var j = 0; j < columns; j++) {
+      for (var j = 0; j < columns && i + j < children.length; j++) {
         if (j > 0) cells.add(const SizedBox(width: 10));
-        cells.add(Expanded(child: i + j < children.length ? children[i + j] : const SizedBox()));
+        cells.add(Expanded(child: children[i + j]));
       }
       final row = Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: cells);
       if (rows.isNotEmpty) rows.add(const SizedBox(height: 10));

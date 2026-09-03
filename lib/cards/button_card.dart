@@ -64,9 +64,11 @@ class _ButtonCardState extends State<ButtonCard> {
     return list.where((i) => i['entity'] != null || i['service'] != null).take(6).toList();
   }
 
+  /// Never more columns than buttons: the row is always shared by the buttons
+  /// that are in it, and the compact styling belongs to three across.
   int get _columns {
-    if (_btns.length == 1) return 1;
-    return c.intOr('columns', 2).clamp(1, 3);
+    if (_btns.isEmpty) return 1;
+    return c.intOr('columns', 2).clamp(1, 3).clamp(1, _btns.length);
   }
 
   void _later(VoidCallback fn, int ms) => _timers.add(Timer(Duration(milliseconds: ms), fn));
