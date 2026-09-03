@@ -55,11 +55,16 @@ class _ShellState extends State<Shell> {
   @override
   void initState() {
     super.initState();
-    // A pushed setup.json wins over whatever is stored, then is gone.
-    Settings.consumeSetupFile().then((_) => Settings.load()).then((s) => setState(() {
-          _settings = s;
-          _loaded = true;
-        }));
+    // A pushed setup.json wins over whatever is stored, then is gone. An
+    // `--ez setup true` launch extra opens the setup screen, for adb.
+    Settings.consumeSetupFile()
+        .then((_) => Settings.load())
+        .then((s) async => (s, await Device.wantsSetup()))
+        .then((r) => setState(() {
+              _settings = r.$1;
+              _showSetup = r.$2;
+              _loaded = true;
+            }));
   }
 
   @override
@@ -109,7 +114,6 @@ class _DashboardState extends State<Dashboard> {
   List<PanelPage> _pages = const [];
   String? _error;
   Future<void> Function()? _unsubLovelace;
-  final _taps = <DateTime>[];
 
   // screensaver: the dashboard card wins, then setup.json, then none
   ScreensaverConfig? _saverFromDashboard;
@@ -152,6 +156,11 @@ class _DashboardState extends State<Dashboard> {
     _conn.start();
     _armIdle();
     _announcer = Announcer(settings: widget.settings, conn: _conn);
+    // host and user only - the password never goes anywhere near a log
+    debugPrint(widget.settings.hasMqtt
+        ? 'mqtt: configured for ${widget.settings.mqttHost}:${widget.settings.mqttPort} '
+            'as ${widget.settings.mqttUser ?? '(no user)'}'
+        : 'mqtt: not configured (no mqtt block in settings)');
     if (widget.settings.hasMqtt) _startBridge();
   }
 
@@ -225,6 +234,7 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   void dispose() {
+    _hold?.cancel();
     _diag?.cancel();
     _proxAlways?.cancel();
     _lightSub?.cancel();
@@ -296,16 +306,35 @@ class _DashboardState extends State<Dashboard> {
         'Triple-tap the top-left corner to change it.';
   }
 
-  /// Triple-tap the top-left corner to get the setup screen back.
-  void _cornerTap(TapDownDetails d) {
-    if (d.globalPosition.dx > 60 || d.globalPosition.dy > 60) return;
-    final now = DateTime.now();
-    _taps.removeWhere((t) => now.difference(t).inMilliseconds > 900);
-    _taps.add(now);
-    if (_taps.length >= 3) {
-      _taps.clear();
-      widget.onReconfigure(null);
+  /// Two fingers held still for a moment opens the setup screen.
+  ///
+  /// It used to be a triple-tap in a corner, and the corner is always on top
+  /// of somebody's first card - three taps on a "Goodmorning" button with
+  /// confirm on is one armed and one fired. A gesture the cards never use
+  /// cannot be mistaken for one they do.
+  final _fingers = <int, Offset>{};
+  Timer? _hold;
+
+  void _pointerDown(PointerDownEvent e) {
+    _fingers[e.pointer] = e.position;
+    if (_fingers.length == 2) {
+      _hold?.cancel();
+      _hold = Timer(const Duration(milliseconds: 1200), () {
+        if (_fingers.length == 2 && mounted) widget.onReconfigure(null);
+      });
+    } else {
+      _hold?.cancel();
     }
+  }
+
+  void _pointerMove(PointerMoveEvent e) {
+    final start = _fingers[e.pointer];
+    if (start != null && (e.position - start).distance > 24) _hold?.cancel();
+  }
+
+  void _pointerUp(int pointer) {
+    _fingers.remove(pointer);
+    _hold?.cancel();
   }
 
   // ---- idle / screensaver -------------------------------------------------
@@ -386,10 +415,17 @@ class _DashboardState extends State<Dashboard> {
       body: Listener(
         onPointerDown: (e) {
           _touched();
-          _cornerTap(TapDownDetails(globalPosition: e.position));
+          _pointerDown(e);
         },
-        onPointerMove: (_) => _touched(),
-        onPointerUp: (_) => _touched(),
+        onPointerMove: (e) {
+          _touched();
+          _pointerMove(e);
+        },
+        onPointerUp: (e) {
+          _touched();
+          _pointerUp(e.pointer);
+        },
+        onPointerCancel: (e) => _pointerUp(e.pointer),
         child: Stack(
           children: [
             if (_pages.isNotEmpty)

@@ -210,8 +210,14 @@ light for brightness. If instead you see a message, it says what is wrong: a rej
 puts the setup screen back, and a dashboard that cannot be loaded lists the dashboards that do
 exist, or tells you to take control of it in Home Assistant.
 
-You can also type all of this on the panel's setup screen. Triple-tap the top-left corner to
-get that screen back at any time.
+You can also type all of this on the panel's setup screen. To get that screen back at any
+time, hold **two fingers** still on the dashboard for about a second — a gesture no card
+uses, so it cannot fire one by accident. From your desk:
+
+```bash
+adb -s 10.0.0.50:5555 shell am force-stop nl.mennovanhout.nspanel
+adb -s 10.0.0.50:5555 shell am start -n nl.mennovanhout.nspanel/nl.mennovanhout.nspanel_app.MainActivity --ez setup true
+```
 
 ### 6. Make the panel a Home Assistant device
 
@@ -334,6 +340,6 @@ To update the app on a panel, `adb install -r` the new APK; settings survive.
 | No device in Home Assistant | The app cannot reach the broker, or the credentials are wrong | `adb logcat -d \| grep mqtt` on the panel says which. Check host, port, user, password; the MQTT integration must be set up in HA. |
 | Announce is silent | No TTS engine, or the panel cannot reach the audio URL | Set `tts_engine` (e.g. `tts.google_en_com`) in `setup.json`; make sure `url` is reachable from the panel. |
 | Brightness does not change from HA | The permission was not granted | The `appops` command from step 4. |
-| The panel does not wake when you walk up | The sensor's direction or range is not what the default assumes | Triple-tap top-left, watch "Proximity sensor now" as you approach, set `proximity_delta` or `proximity_below` / `proximity_above`. |
+| The panel does not wake when you walk up | The sensor's direction or range is not what the default assumes | Open the setup screen (two-finger hold), watch "Proximity sensor now" as you approach, set `proximity_delta` or `proximity_below` / `proximity_above`. |
 | Photos are squashed or the screensaver is dark | Old build | Update the app; the current one fits pictures to the screen on black. |
 | Everything is laggy | You are looking at the dashboard in the panel's browser | That is what the app is for. The browser on this hardware is the bottleneck, not the cards. |

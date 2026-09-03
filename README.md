@@ -86,7 +86,7 @@ when different panels want different pictures; the dashboard card wins when both
 **Proximity.** The sensor reports a graded value at ~10 Hz, not near/far, and which way it moves
 when someone approaches depends on the unit. So by default the app takes the first two seconds
 of the screensaver as the resting level and wakes when a reading departs from it by
-`proximity_delta`. The setup screen (triple-tap the top-left corner) shows the live value; watch
+`proximity_delta`. The setup screen (two-finger hold) shows the live value; watch
 it as you walk up, and if you would rather be explicit, `proximity_below: 30` or
 `proximity_above: 90` wake on an absolute threshold instead.
 
@@ -106,7 +106,14 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk
 
 First launch asks for the Home Assistant URL, a long-lived access token (profile → Security →
 bottom of the page), and optionally which dashboard (its `url_path`; empty for the default).
-The token is stored on the panel only. Triple-tap the top-left corner to get that screen back.
+The token is stored on the panel only. To get that screen back later, hold **two fingers**
+still on the dashboard for a second - a gesture no card uses, so it cannot fire one by
+accident - or from your desk:
+
+```bash
+adb shell am force-stop nl.mennovanhout.nspanel
+adb shell am start -n nl.mennovanhout.nspanel/nl.mennovanhout.nspanel_app.MainActivity --ez setup true
+```
 
 ### Provisioning without a keyboard
 

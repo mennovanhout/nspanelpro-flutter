@@ -69,6 +69,12 @@ class MainActivity : FlutterActivity() {
         MethodChannel(messenger, "nl.mennovanhout.nspanel/sensors").setMethodCallHandler { call, result ->
             when (call.method) {
                 "proximityMaxRange" -> result.success(proximity?.maximumRange?.toDouble())
+                // adb shell am start -n <this activity> --ez setup true : open the setup screen
+                "wantsSetup" -> {
+                    val wants = intent?.getBooleanExtra("setup", false) ?: false
+                    intent?.removeExtra("setup")
+                    result.success(wants)
+                }
                 "androidId" -> result.success(
                     Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID))
                 "wifiRssi" -> {

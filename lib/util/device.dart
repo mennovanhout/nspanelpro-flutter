@@ -20,6 +20,15 @@ class Device {
     }
   }
 
+  /// True when the app was launched with `--ez setup true`, once.
+  static Future<bool> wantsSetup() async {
+    try {
+      return (await _m.invokeMethod<bool>('wantsSetup')) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Stream<double> get light =>
       _lightStream ??= _light.receiveBroadcastStream().map((v) => (v as num).toDouble());
 
