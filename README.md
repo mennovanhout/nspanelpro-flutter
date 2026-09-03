@@ -132,6 +132,18 @@ the Mali-G31, switch the renderer off Impeller in `AndroidManifest.xml`:
 <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false"/>
 ```
 
+## Motion
+
+Four moments animate, and only those: cards rise into place when a page first shows (fade
+and a 14px lift, 60 ms apart); the screensaver fades in over the dashboard; it fades out
+again, with touches reaching the dashboard the moment the fade starts rather than when it
+ends; and a new photo crossfades over the old with a soft push, the first one fading in
+rather than popping when its bytes land.
+
+All of it is opacity and transform, each a one-off - the same budget the cards keep, because
+the panel is the reason this app exists. Nothing runs continuously, and nothing animates
+while you are dragging a card.
+
 ## What carries over from the web cards, and what does not
 
 The rules that make the web cards feel right on this hardware are decisions, not web code,

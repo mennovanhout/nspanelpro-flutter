@@ -11,6 +11,7 @@ import 'config/settings.dart';
 import 'ha/connection.dart';
 import 'ha/states.dart';
 import 'ha/transport.dart';
+import 'ui/motion.dart';
 import 'ui/pager.dart';
 import 'ui/screensaver.dart';
 import 'ui/setup_screen.dart';
@@ -55,9 +56,12 @@ class _ShellState extends State<Shell> {
 
   @override
   Widget build(BuildContext context) {
-    if (!_loaded) return const Scaffold(body: SizedBox());
-    if (_settings == null || _showSetup) {
-      return SetupScreen(
+    Widget child;
+    if (!_loaded) {
+      child = const Scaffold(key: ValueKey('blank'), body: SizedBox());
+    } else if (_settings == null || _showSetup) {
+      child = SetupScreen(
+        key: const ValueKey('setup'),
         initial: _settings,
         message: _setupMessage,
         onSaved: (s) => setState(() {
@@ -66,15 +70,18 @@ class _ShellState extends State<Shell> {
           _setupMessage = null;
         }),
       );
+    } else {
+      child = Dashboard(
+        key: ValueKey('dash|${_settings!.url}|${_settings!.token.hashCode}|${_settings!.dashboard}'),
+        settings: _settings!,
+        onReconfigure: (msg) => setState(() {
+          _showSetup = true;
+          _setupMessage = msg;
+        }),
+      );
     }
-    return Dashboard(
-      key: ValueKey('${_settings!.url}|${_settings!.token.hashCode}|${_settings!.dashboard}'),
-      settings: _settings!,
-      onReconfigure: (msg) => setState(() {
-        _showSetup = true;
-        _setupMessage = msg;
-      }),
-    );
+    // setup <-> dashboard, and the blank first frame -> whichever comes: a crossfade
+    return AnimatedSwitcher(duration: const Duration(milliseconds: 450), child: child);
   }
 }
 
@@ -230,9 +237,16 @@ class _DashboardState extends State<Dashboard> {
     _armIdle();
   }
 
+  // _saving is the target state; _saverMounted keeps the overlay in the tree
+  // while it fades out, so the dashboard is touchable the moment it starts.
+  bool _saverMounted = false;
+
   void _sleep() {
     if (!mounted || _saver == null) return;
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _saverMounted = true;
+    });
     _watchProximity();
   }
 
@@ -240,7 +254,7 @@ class _DashboardState extends State<Dashboard> {
     _prox?.cancel();
     _prox = null;
     _proxBaseline.clear();
-    if (mounted) setState(() => _saving = false);
+    if (mounted && _saving) setState(() => _saving = false);
     _armIdle();
   }
 
@@ -289,7 +303,8 @@ class _DashboardState extends State<Dashboard> {
                     children: [
                       for (var i = 0; i < p.cards.length; i++) ...[
                         if (i > 0) const SizedBox(height: Ns.gap),
-                        buildCard(p.cards[i], _env),
+                        // cards rise into place, staggered, when a page first shows
+                        Enter(index: i, child: buildCard(p.cards[i], _env)),
                       ],
                     ],
                   ),
@@ -314,8 +329,16 @@ class _DashboardState extends State<Dashboard> {
                   child: Text(_error!, style: const TextStyle(color: Ns.danger, fontSize: 12)),
                 ),
               ),
-            if (_saving && _saver != null)
-              Positioned.fill(child: Screensaver(config: _saver!, onWake: _wake)),
+            if (_saverMounted && _saver != null)
+              Positioned.fill(
+                child: Reveal(
+                  visible: _saving,
+                  onHidden: () {
+                    if (mounted) setState(() => _saverMounted = false);
+                  },
+                  child: Screensaver(config: _saver!, onWake: _wake),
+                ),
+              ),
             Positioned(
               top: 6,
               right: 8,

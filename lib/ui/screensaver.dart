@@ -116,8 +116,19 @@ class _ScreensaverState extends State<Screensaver> {
         children: [
           const ColoredBox(color: Colors.black),
           if (_imageUrl != null)
+            // A new photo crossfades over the old one with a soft push - the
+            // incoming settles from 1.04x, the outgoing drifts up to it.
             AnimatedSwitcher(
-              duration: const Duration(milliseconds: 900),
+              duration: const Duration(milliseconds: 1200),
+              switchInCurve: Curves.easeOut,
+              switchOutCurve: Curves.easeIn,
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 1.04, end: 1).animate(anim),
+                  child: child,
+                ),
+              ),
               child: Image(
                 image: _provider(_imageUrl!),
                 key: ValueKey(_imageSeq),
@@ -126,7 +137,15 @@ class _ScreensaverState extends State<Screensaver> {
                 fit: cfg.imageFit == 'cover' ? BoxFit.cover : BoxFit.contain,
                 gaplessPlayback: true,
                 errorBuilder: (_, _, _) => const ColoredBox(color: Ns.ground),
-                loadingBuilder: (_, child, progress) => progress == null ? child : const SizedBox(),
+                // the first frame fades in rather than popping when the bytes land
+                frameBuilder: (_, child, frame, syncLoaded) => syncLoaded
+                    ? child
+                    : AnimatedOpacity(
+                        opacity: frame == null ? 0 : 1,
+                        duration: const Duration(milliseconds: 700),
+                        curve: Curves.easeOut,
+                        child: child,
+                      ),
               ),
             ),
           if (cfg.clock)
