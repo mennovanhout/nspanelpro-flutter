@@ -8,6 +8,9 @@ The web cards are careful with the panel's frame budget, but they are passengers
 dashboard in the companion app and the WebView is also running the whole HA frontend, and on a
 PX30 that is most of the cost. This draws straight to the GPU instead.
 
+**New here?** [TUTORIAL.md](TUTORIAL.md) walks from an empty Home Assistant to a working
+panel, and has the short recipe for adding the second, third and fourth one.
+
 ## One config, two renderers
 
 The app **reads your Lovelace dashboard from Home Assistant** over the websocket and renders
