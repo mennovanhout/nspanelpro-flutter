@@ -1,0 +1,108 @@
+import 'package:flutter/material.dart';
+
+import '../config/settings.dart';
+import 'theme.dart';
+
+/// Where is Home Assistant, and who are we. Shown once, and again on a
+/// rejected token or a triple-tap in the top-left corner.
+class SetupScreen extends StatefulWidget {
+  const SetupScreen({super.key, this.initial, this.message, required this.onSaved});
+  final Settings? initial;
+  final String? message;
+  final ValueChanged<Settings> onSaved;
+
+  @override
+  State<SetupScreen> createState() => _SetupScreenState();
+}
+
+class _SetupScreenState extends State<SetupScreen> {
+  late final _url = TextEditingController(text: widget.initial?.url ?? 'http://homeassistant.local:8123');
+  late final _dash = TextEditingController(text: widget.initial?.dashboard ?? '');
+  final _token = TextEditingController();
+  String? _err;
+
+  @override
+  void initState() {
+    super.initState();
+    _err = widget.message;
+  }
+
+  @override
+  void dispose() {
+    _url.dispose();
+    _dash.dispose();
+    _token.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final token = _token.text.trim().isEmpty ? (widget.initial?.token ?? '') : _token.text.trim();
+    if (_url.text.trim().isEmpty || token.isEmpty) {
+      setState(() => _err = 'Both the URL and a token are needed.');
+      return;
+    }
+    final s = Settings(url: _url.text.trim(), token: token, dashboard: _dash.text.trim());
+    s.save().then((_) => widget.onSaved(s));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final field = InputDecoration(
+      filled: true,
+      fillColor: Ns.surface,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      contentPadding: const EdgeInsets.all(12),
+    );
+    return Scaffold(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(22),
+          children: [
+            const Text('Connect to Home Assistant',
+                style: TextStyle(color: Ns.text, fontSize: 21, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            const Text(
+              'Create a long-lived access token under your profile, Security, at the '
+              'bottom. It is stored on this panel only.',
+              style: TextStyle(color: Ns.muted, fontSize: 14, height: 1.45),
+            ),
+            const SizedBox(height: 16),
+            const Text('Home Assistant URL', style: TextStyle(color: Ns.muted, fontSize: 13)),
+            const SizedBox(height: 6),
+            TextField(controller: _url, keyboardType: TextInputType.url, decoration: field),
+            const SizedBox(height: 12),
+            Text(
+              widget.initial == null ? 'Long-lived access token' : 'New token (leave empty to keep the current one)',
+              style: const TextStyle(color: Ns.muted, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            TextField(controller: _token, maxLines: 3, decoration: field, style: const TextStyle(fontSize: 13)),
+            const SizedBox(height: 12),
+            const Text('Dashboard (url path, empty = default)', style: TextStyle(color: Ns.muted, fontSize: 13)),
+            const SizedBox(height: 6),
+            TextField(controller: _dash, decoration: field.copyWith(hintText: 'e.g. nspanel')),
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 18,
+              child: Text(_err ?? '', style: const TextStyle(color: Ns.danger, fontSize: 13)),
+            ),
+            const SizedBox(height: 6),
+            SizedBox(
+              height: 56,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Ns.amber,
+                  foregroundColor: Ns.ground,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  textStyle: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                ),
+                onPressed: _save,
+                child: const Text('Connect'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
