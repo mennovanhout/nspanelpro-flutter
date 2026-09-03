@@ -10,6 +10,7 @@ class ScreensaverConfig {
     this.afterSeconds = 300,
     this.imageUrl,
     this.imageRefreshSeconds = 600,
+    this.imageFit = 'contain',
     this.clock = true,
     this.moveSeconds = 60,
     this.frost = true,
@@ -22,6 +23,10 @@ class ScreensaverConfig {
   final int afterSeconds;
   final String? imageUrl;
   final int imageRefreshSeconds;
+
+  /// `contain`: the whole picture, its own shape, black around it.
+  /// `cover`: fill the screen and crop.
+  final String imageFit;
   final bool clock;
   final int moveSeconds;
   final bool frost;
@@ -42,6 +47,7 @@ class ScreensaverConfig {
         afterSeconds: (m['after'] as num?)?.toInt() ?? 300,
         imageUrl: m['image_url']?.toString(),
         imageRefreshSeconds: (m['image_refresh'] as num?)?.toInt() ?? 600,
+        imageFit: m['image_fit'] == 'cover' ? 'cover' : 'contain',
         clock: m['clock'] is bool ? m['clock'] as bool : true,
         moveSeconds: (m['move_every'] as num?)?.toInt() ?? 60,
         frost: m['frost'] is bool ? m['frost'] as bool : true,

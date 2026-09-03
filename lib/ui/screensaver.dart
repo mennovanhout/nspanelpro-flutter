@@ -82,17 +82,29 @@ class _ScreensaverState extends State<Screensaver> {
     setState(() => _imageUrl = '$base${sep}_ns=${DateTime.now().millisecondsSinceEpoch}');
     _imageSeq++;
     if (old != null) {
-      final size = MediaQuery.sizeOf(context) * MediaQuery.devicePixelRatioOf(context);
       NetworkImage(old).evict();
-      ResizeImage(NetworkImage(old), width: size.width.round(), height: size.height.round()).evict();
+      _provider(old).evict();
     }
+  }
+
+  /// Decode at the panel's size, not the photo's - a 4000px photo decoded
+  /// whole is most of this device's spare memory. `fit` keeps the aspect
+  /// ratio while bounding both sides; passing width and height without it
+  /// squashes the picture to exactly that box, which is the bug this fixes.
+  ImageProvider _provider(String url) {
+    final size = MediaQuery.sizeOf(context) * MediaQuery.devicePixelRatioOf(context);
+    return ResizeImage(
+      NetworkImage(url),
+      width: size.width.round(),
+      height: size.height.round(),
+      policy: ResizeImagePolicy.fit,
+      allowUpscaling: false,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final cfg = widget.config;
-    final size = MediaQuery.sizeOf(context);
-    final dpr = MediaQuery.devicePixelRatioOf(context);
     final hh = _now.hour.toString().padLeft(2, '0');
     final mm = _now.minute.toString().padLeft(2, '0');
 
@@ -106,14 +118,12 @@ class _ScreensaverState extends State<Screensaver> {
           if (_imageUrl != null)
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 900),
-              child: Image.network(
-                _imageUrl!,
+              child: Image(
+                image: _provider(_imageUrl!),
                 key: ValueKey(_imageSeq),
-                fit: BoxFit.cover,
-                // decode at the panel's size, not the photo's - a 4000px
-                // photo decoded whole is most of this device's spare memory
-                cacheWidth: (size.width * dpr).round(),
-                cacheHeight: (size.height * dpr).round(),
+                // the whole picture, its own shape, black around it - unless
+                // asked to fill the screen and crop
+                fit: cfg.imageFit == 'cover' ? BoxFit.cover : BoxFit.contain,
                 gaplessPlayback: true,
                 errorBuilder: (_, _, _) => const ColoredBox(color: Ns.ground),
                 loadingBuilder: (_, child, progress) => progress == null ? child : const SizedBox(),

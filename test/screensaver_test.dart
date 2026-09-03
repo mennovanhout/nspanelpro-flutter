@@ -6,6 +6,9 @@ void main() {
     final s = ScreensaverConfig.fromMap({});
     expect(s.afterSeconds, 300);
     expect(s.imageUrl, isNull);
+    expect(s.imageFit, 'contain');
+    expect(ScreensaverConfig.fromMap({'image_fit': 'cover'}).imageFit, 'cover');
+    expect(ScreensaverConfig.fromMap({'image_fit': 'stretch'}).imageFit, 'contain');
     expect(s.clock, isTrue);
     expect(s.frost, isTrue);
     expect(s.wakeOnProximity, isTrue);
