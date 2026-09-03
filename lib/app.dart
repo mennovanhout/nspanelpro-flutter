@@ -29,7 +29,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.3.2';
+const appVersion = '0.3.3';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});
@@ -136,7 +136,6 @@ class _DashboardState extends State<Dashboard> {
   bool _saving = false;
   Timer? _idle;
   StreamSubscription<double>? _prox;
-  final _proxBaseline = <double>[];
 
   ScreensaverConfig? get _saver {
     if (_forcedSaver != null) return _forcedSaver;
@@ -343,6 +342,10 @@ class _DashboardState extends State<Dashboard> {
         _pages = pages;
         _scheduleWarmup();
         _saverFromDashboard = ScreensaverConfig.findInLovelace(cfg);
+        // a fresh panel has no cached config, so this is the first moment
+        // there is a screensaver to arm; a touch would arm it too, but a
+        // panel nobody touches should still go to sleep
+        if (!_saving) _armIdle();
         _error = pages.isEmpty
             ? 'The dashboard "${path.isEmpty ? 'default' : path}" has no cards this app can '
                 'draw. It needs custom:nspanel-* cards.'
@@ -469,40 +472,37 @@ class _DashboardState extends State<Dashboard> {
       _saving = true;
       _saverMounted = true;
     });
+    debugPrint('screensaver: on (${force ? 'switched on from HA' : 'idle'})');
     _bridge?.screensaver(true);
     _watchProximity();
   }
 
-  void _wake() {
+  void _wake([String why = 'touch or HA']) {
     _prox?.cancel();
     _prox = null;
-    _proxBaseline.clear();
+    if (_saving) debugPrint('screensaver: off ($why)');
     if (mounted && _saving) setState(() => _saving = false);
     _forcedSaver = null;
     _bridge?.screensaver(false);
     _armIdle();
   }
 
-  /// Wake on approach. The sensor reports a graded value, and which way it
-  /// moves when someone walks up depends on the unit, so the first two
-  /// seconds of readings set the resting level and a departure from it by
-  /// `proximity_delta` wakes the panel. Absolute below/above overrides exist
-  /// for anyone who has watched the readout and knows.
+  /// Wake on approach; the reading of the sensor is [ApproachDetector]'s.
   void _watchProximity() {
     final s = _saver;
     if (s == null || !s.wakeOnProximity) return;
-    _proxBaseline.clear();
+    final detector = ApproachDetector(
+      delta: s.proximityDelta,
+      below: s.proximityBelow,
+      above: s.proximityAbove,
+    );
+    var logged = false;
     _prox = Proximity.stream.listen((v) {
-      if (s.proximityBelow != null && v < s.proximityBelow!) return _wake();
-      if (s.proximityAbove != null && v > s.proximityAbove!) return _wake();
-      if (s.proximityBelow != null || s.proximityAbove != null) return;
-      if (_proxBaseline.length < 20) {
-        _proxBaseline.add(v);
-        return;
+      if (detector.feed(v)) _wake('approach: reading $v, resting ${detector.resting}');
+      if (!logged && detector.resting != null) {
+        logged = true;
+        debugPrint('proximity: resting at ${detector.resting}');
       }
-      final sorted = [..._proxBaseline]..sort();
-      final median = sorted[sorted.length ~/ 2];
-      if ((v - median).abs() > s.proximityDelta) _wake();
     }, onError: (_) {
       // no sensor on this device; touch still wakes it
     });

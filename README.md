@@ -88,9 +88,12 @@ The same keys also go under `screensaver` in a pushed `setup.json`, which is the
 when different panels want different pictures; the dashboard card wins when both exist.
 
 **Proximity.** The sensor reports a graded value at ~10 Hz, not near/far, and which way it moves
-when someone approaches depends on the unit. So by default the app takes the first two seconds
-of the screensaver as the resting level and wakes when a reading departs from it by
-`proximity_delta`. The setup screen (two-finger hold) shows the live value; watch
+when someone approaches depends on the unit. Its resting level depends on the wall it hangs on
+(58 on one wall in this house, 410 on another), its noise grows with that level, and the
+display's own light reaches it, so the level shifts when the dark photo replaces the bright
+dashboard. So the app ignores the first two seconds of the screensaver, takes the next two as
+the resting level, and wakes when two readings in a row depart from it by `proximity_delta`
+or 15% of the resting level, whichever is more. The setup screen (two-finger hold) shows the live value; watch
 it as you walk up, and if you would rather be explicit, `proximity_below: 30` or
 `proximity_above: 90` wake on an absolute threshold instead.
 
