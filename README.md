@@ -185,7 +185,16 @@ against a fake broker the same way the HA client is.
 **Announcements.** `notify.send_message` with a message speaks it: the app asks Home
 Assistant's own TTS engine for the audio (`/api/tts_get_url`), so the voice is whichever you
 have configured, and nothing is synthesised on the panel. Leave `tts_engine` empty to use the
-first engine HA lists, or name one, e.g. `tts.google_en_com`.
+first engine HA lists, or name one, e.g. `tts.google_en_com`. Try it from Developer tools →
+Actions:
+
+```yaml
+action: notify.send_message
+target:
+  entity_id: notify.nspanel_dining_announce
+data:
+  message: The washing machine is done
+```
 
 A message that names audio is played instead of spoken:
 
@@ -197,7 +206,14 @@ A message that names audio is played instead of spoken:
 | `https://…/bell.mp3` | any URL |
 
 JSON works too, and adds two things: `wake` brings the panel out of the screensaver first,
-and `volume` sets the speaker for this announcement. A doorbell, then, is one automation:
+and `volume` sets the speaker for this announcement. Spoken text goes under `message`, a file
+under `url`, a built-in sound under `sound`:
+
+```yaml
+message: '{"message": "Dinner is ready", "wake": true, "volume": 60}'
+```
+
+A doorbell, then, is one automation:
 
 ```yaml
 alias: Doorbell on the panels

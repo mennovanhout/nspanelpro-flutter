@@ -271,6 +271,9 @@ actions:
       message: '{"sound": "doorbell", "wake": true, "volume": 80}'
 ```
 
+Spoken text can take the same JSON, with the words under `message`:
+`'{"message": "Dinner is ready", "wake": true, "volume": 60}'`.
+
 Several panels? Put all their Announce entities in `target` and every one rings.
 
 If you use Mosquitto from the Home Assistant add-on store, the host is Home Assistant's IP
