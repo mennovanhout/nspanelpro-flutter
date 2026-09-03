@@ -73,7 +73,7 @@ matching empty card, so Lovelace does not complain either); the app reads it and
 ```yaml
 - type: custom:nspanel-screensaver
   after: 300                  # seconds without a touch; default 300
-  image_url: https://mennovanhout.nl/r/62bcce7ed0807c94b3432152b3ba00a4
+  image_url: https://fastly.picsum.photos/id/650/440/440.jpg
   image_refresh: 600          # seconds between new pictures while idle; default 600
   image_fit: contain          # the whole picture, its own shape, black around it (default);
                               # `cover` fills the screen and crops
