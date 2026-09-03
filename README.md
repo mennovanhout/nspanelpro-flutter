@@ -125,12 +125,9 @@ The app reads it once, saves the settings, and deletes the file. Delete `setup.j
 computer too; it has your token in it. Pushing a new file later replaces the stored settings,
 which is also how you re-point a panel at a different HA or dashboard from your desk.
 
-The panel is Android 8.1; the build targets API 24 and up. If you see rendering glitches on
-the Mali-G31, switch the renderer off Impeller in `AndroidManifest.xml`:
-
-```xml
-<meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false"/>
-```
+The panel is Android 8.1; the build targets API 24 and up. On the Mali-G31 the Flutter engine
+falls back from Impeller to Skia on its own (it says so in logcat at startup, worded as an
+"opt-out"); nothing to configure, and that is the renderer every measurement here was made on.
 
 ## The panel as a Home Assistant device
 
