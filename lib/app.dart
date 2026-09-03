@@ -29,7 +29,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.3.0';
+const appVersion = '0.3.1';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});

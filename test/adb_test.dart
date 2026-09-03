@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -12,6 +13,8 @@ class FakeAdbd {
   late ServerSocket server;
   final opened = <String>[];
   final okays = <(int, int)>[];
+  /// Completes when the client's CLSE has arrived, i.e. after its acks.
+  final closed = Completer<void>();
   int? clientMaxData;
 
   Future<void> start() async {
@@ -41,6 +44,7 @@ class FakeAdbd {
               okays.add((m.arg0, m.arg1));
             case adbClse:
               s.destroy();
+              if (!closed.isCompleted) closed.complete();
           }
         }
       });
@@ -81,6 +85,8 @@ void main() {
     final out = await d.shell().run('pm install -r "/sdcard/x.apk"');
     expect(out, 'Success\n');
     expect(d.opened, ['shell:pm install -r "/sdcard/x.apk"']);
+    // the client is done when its acks are flushed, not when they are read
+    await d.closed.future.timeout(const Duration(seconds: 5));
     expect(d.okays.length, 2, reason: 'each WRTE is acked');
     await d.server.close();
   });

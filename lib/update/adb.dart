@@ -99,9 +99,12 @@ class AdbShell {
             socket.add(adbPacket(adbOkay, localId, m.arg0, const []));
           case adbClse:
             socket.add(adbPacket(adbClse, localId, m.arg0, const []));
-            finish();
-            // flush, not destroy: the acks and this CLSE are still in the buffer
-            socket.flush().whenComplete(socket.destroy).ignore();
+            // flush, not destroy: the acks and this CLSE are still in the
+            // buffer, and the result is not "done" until they have gone out
+            socket.flush().whenComplete(() {
+              socket.destroy();
+              finish();
+            }).ignore();
           default:
             break; // OKAY: nothing to do
         }
