@@ -18,12 +18,28 @@ class Announcer {
   final _player = AudioPlayer();
   String? _engine;
 
-  Future<void> play(String url) async {
+  /// Plays whatever `ref` names:
+  ///   sound:doorbell          a built-in chime (doorbell, chime, alert)
+  ///   media-source://...      a file from HA's media browser, resolved via HA
+  ///   /local/x.mp3            a path on HA
+  ///   https://...             any URL
+  Future<void> play(String ref) async {
     try {
-      await _player.setUrl(settings.resolve(url));
+      if (ref.startsWith('sound:')) {
+        final name = ref.substring(6).trim().toLowerCase();
+        await _player.setAsset('assets/sounds/$name.wav');
+      } else {
+        var url = ref;
+        if (ref.startsWith('media-source://')) {
+          final r = await conn.send({'type': 'media_source/resolve_media', 'media_content_id': ref});
+          url = ((r as Map)['url'] ?? '').toString();
+          if (url.isEmpty) throw StateError('media source did not resolve');
+        }
+        await _player.setUrl(settings.resolve(url));
+      }
       await _player.play();
     } catch (e) {
-      debugPrint('play failed: $e');
+      debugPrint('play failed for $ref: $e');
     }
   }
 

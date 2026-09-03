@@ -203,6 +203,7 @@ class _DashboardState extends State<Dashboard> {
       onSay: _announcer.say,
       onPlay: _announcer.play,
       onStop: _announcer.stop,
+      onWake: _wake,
     );
     _bridge = b;
     _mqtt!.connected.addListener(() {

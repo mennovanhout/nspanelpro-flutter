@@ -19,9 +19,9 @@ working - and the panel follows; edit the dashboard and it reloads on its own. T
 config still works in a browser with the web cards, on a phone or a tablet.
 
 The layout it expects is the one the cards' README recommends: a panel view holding a swipe
-card whose children are the pages. A plain view with no swipe card becomes one page, stacks
-flattened into it. Cards it does not know are shown as a marked gap rather than dropped, so
-you can see what a dashboard is asking for that this app cannot do.
+card whose children are the pages. A view with no swipe card becomes one page. Cards it does
+not know are shown as a marked gap rather than dropped, so you can see what a dashboard is
+asking for that this app cannot do.
 
 ```yaml
 views:
@@ -98,11 +98,18 @@ is fetched, so a stream of large photos does not grow memory.
 
 ## Install
 
+Every push builds an APK on GitHub Actions — the **Actions** tab, latest run, under
+Artifacts, `nspanel-app-arm64`. The panel is arm64; that is the only one it needs. Or build
+it yourself:
+
 ```bash
-flutter build apk --release
+flutter build apk --release --split-per-abi
 adb connect <panel-ip>:5555
-adb install -r build/app/outputs/flutter-apk/app-release.apk
+adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
+
+Enabling adb on the panel, and everything after this, is walked through step by step in
+[TUTORIAL.md](TUTORIAL.md).
 
 First launch asks for the Home Assistant URL, a long-lived access token (profile → Security →
 bottom of the page), and optionally which dashboard (its `url_path`; empty for the default).
@@ -132,8 +139,10 @@ adb shell monkey -p nl.mennovanhout.nspanel -c android.intent.category.LAUNCHER 
 ```
 
 The app reads it once, saves the settings, and deletes the file. Delete `setup.json` from your
-computer too; it has your token in it. Pushing a new file later replaces the stored settings,
-which is also how you re-point a panel at a different HA or dashboard from your desk.
+computer too; it has your token in it. A later file is a **partial** update — only the keys in
+it change — which is how you re-point a panel at a different dashboard, or adjust its
+screensaver, from your desk without re-entering the token. The full set of keys is `url`,
+`token`, `dashboard`, `name`, `mqtt`, `tts_engine` and `screensaver`.
 
 The panel is Android 8.1; the build targets API 24 and up. On the Mali-G31 the Flutter engine
 falls back from Impeller to Skia on its own (it says so in logcat at startup, worded as an
@@ -154,7 +163,7 @@ Give the app your MQTT broker and it registers itself through MQTT discovery: on
 | `number` Page | which page is showing; set it to turn the page |
 | `number` Screen brightness | 0–255 |
 | `number` Volume | speaker, 0–100 |
-| `notify` Announce | `notify.send_message`: text is spoken, a URL is played |
+| `notify` Announce | `notify.send_message`: text is spoken; a URL, an HA path, a media-browser file or a built-in sound is played |
 | `button` Stop audio | |
 | Wi-Fi signal, SoC temperature, app version, last touch | diagnostics |
 
@@ -176,9 +185,36 @@ against a fake broker the same way the HA client is.
 **Announcements.** `notify.send_message` with a message speaks it: the app asks Home
 Assistant's own TTS engine for the audio (`/api/tts_get_url`), so the voice is whichever you
 have configured, and nothing is synthesised on the panel. Leave `tts_engine` empty to use the
-first engine HA lists, or name one, e.g. `tts.google_en_com`. A message that is a URL is
-played instead. Automations can also publish straight to `nspanel/<id>/say/set`, as text or
-as `{"url": "..."}`.
+first engine HA lists, or name one, e.g. `tts.google_en_com`.
+
+A message that names audio is played instead of spoken:
+
+| Message | Plays |
+| --- | --- |
+| `sound:doorbell` | a built-in chime — `doorbell` (ding-dong), `chime` (one bell), `alert` (three beeps) |
+| `/local/sounds/bell.mp3` | a file in Home Assistant's `www` folder |
+| `media-source://media_source/local/bell.mp3` | a file from HA's media browser, resolved through HA |
+| `https://…/bell.mp3` | any URL |
+
+JSON works too, and adds two things: `wake` brings the panel out of the screensaver first,
+and `volume` sets the speaker for this announcement. A doorbell, then, is one automation:
+
+```yaml
+alias: Doorbell on the panels
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.doorbell
+    to: "on"
+actions:
+  - action: notify.send_message
+    target:
+      entity_id: notify.nspanel_dining_announce
+    data:
+      message: '{"sound": "doorbell", "wake": true, "volume": 80}'
+```
+
+The same JSON can be published straight to `nspanel/<id>/say/set`, and the built-in sounds are
+synthesised bells — there are no samples to license, and nothing to host.
 
 **Screen brightness** needs the `WRITE_SETTINGS` permission, which Android grants only by a
 one-time toggle on the panel - or from your desk:
@@ -222,10 +258,13 @@ render; this is a panel, not a browser.
 ## Layout
 
 ```
-lib/ha/          websocket protocol, entity state with a notifier per entity
-lib/config/      settings (url, token, dashboard) and the Lovelace -> pages parser
-lib/ui/          the shared drag surface, the long-press sheet, the pager, setup
+lib/ha/          Home Assistant websocket, entity state with a notifier per entity
+lib/mqtt/        MQTT 3.1.1 client (hand-rolled) and the HA-discovery bridge
+lib/audio/       the speaker: TTS via HA, URLs, media-browser files, built-in sounds
+lib/config/      settings (url, token, dashboard, mqtt, ...), Lovelace -> pages, screensaver
+lib/ui/          the shared drag surface, the long-press sheet, the pager, screensaver, setup
 lib/cards/       one file per card, plus the registry that maps type -> widget
-lib/util/        colour clamp, icon lookup, number formatting
-test/            colour, config parsing, and the protocol against a fake HA
+lib/util/        colour clamp, icon lookup, number formatting, the panel's sensors
+assets/sounds/   doorbell, chime, alert - synthesised
+test/            colour, config parsing, the HA protocol and MQTT against fakes
 ```

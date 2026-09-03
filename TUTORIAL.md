@@ -238,10 +238,40 @@ device with the name from step 5, and these entities:
   the panel to sleep or wake it from an automation
 - **Page** (which page is showing; set it to turn the page), **Screen brightness**, **Volume**
 - **Announce** — a notify entity: `notify.send_message` with text speaks it through your HA
-  TTS engine; a URL is played instead. Plus a **Stop audio** button.
+  TTS engine; `sound:doorbell` (or `chime`, `alert`), a URL, a `/local/...` path or a
+  media-browser file is played instead. Plus a **Stop audio** button.
 - Wi-Fi signal, SoC temperature, app version, last touch, as diagnostics
 
 The device goes unavailable the moment the panel drops off the network.
+
+Try it from Developer tools → Actions:
+
+```yaml
+action: notify.send_message
+target:
+  entity_id: notify.nspanel_dining_announce
+data:
+  message: Hello from Home Assistant
+```
+
+and a doorbell is the same call from an automation, as JSON so it can also wake the panel and
+set the volume:
+
+```yaml
+alias: Doorbell on the panels
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.doorbell
+    to: "on"
+actions:
+  - action: notify.send_message
+    target:
+      entity_id: notify.nspanel_dining_announce
+    data:
+      message: '{"sound": "doorbell", "wake": true, "volume": 80}'
+```
+
+Several panels? Put all their Announce entities in `target` and every one rings.
 
 If you use Mosquitto from the Home Assistant add-on store, the host is Home Assistant's IP
 and the user/password are the ones you created for it. The password goes only into this

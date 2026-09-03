@@ -70,6 +70,7 @@ void main() {
       onSay: (t) => commands.add('say $t'),
       onPlay: (u) => commands.add('play $u'),
       onStop: () => commands.add('stop'),
+      onWake: () => commands.add('wake'),
     );
   });
 
@@ -135,6 +136,27 @@ void main() {
       'play https://x/bell.mp3',
       'say Hello',
       'stop',
+    ]);
+  });
+
+  test('a doorbell: built-in sounds, HA paths, media browser ids, wake and volume', () async {
+    bridge.start();
+    await pumpEventQueue();
+    broker.deliver('nspanel/abc123/say/set', 'sound:doorbell');
+    broker.deliver('nspanel/abc123/say/set', '/local/sounds/bell.mp3');
+    broker.deliver('nspanel/abc123/say/set', 'media-source://media_source/local/bell.mp3');
+    broker.deliver('nspanel/abc123/say/set', '{"sound": "chime", "wake": true, "volume": 80}');
+    broker.deliver('nspanel/abc123/say/set', '{"message": "Someone is at the door", "wake": true}');
+    await pumpEventQueue();
+    expect(commands, [
+      'play sound:doorbell',
+      'play /local/sounds/bell.mp3',
+      'play media-source://media_source/local/bell.mp3',
+      'volume 80',
+      'wake',
+      'play sound:chime',
+      'wake',
+      'say Someone is at the door',
     ]);
   });
 

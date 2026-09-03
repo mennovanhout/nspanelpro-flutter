@@ -14,6 +14,14 @@ import 'client.dart';
 ///
 /// Sensor traffic is rate-limited here, not at the source: the proximity
 /// sensor runs at 10 Hz and nobody wants that on a broker.
+/// What counts as "audio to play" rather than "words to speak".
+bool isPlayable(String text) =>
+    text.startsWith('http://') ||
+    text.startsWith('https://') ||
+    text.startsWith('/') ||
+    text.startsWith('media-source://') ||
+    text.startsWith('sound:');
+
 class PanelBridge {
   PanelBridge({
     required this.mqtt,
@@ -28,6 +36,7 @@ class PanelBridge {
     this.onSay,
     this.onPlay,
     this.onStop,
+    this.onWake,
   });
 
   final MqttClient mqtt;
@@ -43,6 +52,7 @@ class PanelBridge {
   final void Function(String)? onSay;
   final void Function(String)? onPlay;
   final VoidCallback? onStop;
+  final VoidCallback? onWake;
 
   String get base => 'nspanel/$deviceId';
   String get availabilityTopic => '$base/availability';
@@ -144,24 +154,32 @@ class PanelBridge {
     mqtt.subscribe('$base/page/set', (_, v) => _int(v, onPage));
     mqtt.subscribe('$base/screensaver/set', (_, v) => onScreensaver?.call(v.trim().toUpperCase() == 'ON'));
     mqtt.subscribe('$base/stop/set', (_, _) => onStop?.call());
-    // The notify entity sends the message text. A URL plays; anything else is
-    // spoken. Automations that publish JSON get the same treatment by key.
+    // The notify entity sends the message text. Anything that names audio is
+    // played - a URL, an HA path like /local/x.mp3, a media-source:// id from
+    // HA's media browser, or a built-in `sound:doorbell` - and anything else
+    // is spoken. JSON gets the same by key, plus `wake` and `volume`.
     mqtt.subscribe('$base/say/set', (_, v) {
       var text = v.trim();
       try {
         final j = jsonDecode(text);
         if (j is Map) {
+          if (j['volume'] is num) onVolume?.call((j['volume'] as num).round());
+          if (j['wake'] == true) onWake?.call();
+          if (j['sound'] != null) {
+            onPlay?.call('sound:${j['sound']}');
+            return;
+          }
           if (j['url'] != null) {
             onPlay?.call(j['url'].toString());
             return;
           }
-          text = (j['message'] ?? '').toString();
+          text = (j['message'] ?? '').toString().trim();
         }
       } catch (_) {
         // plain text
       }
       if (text.isEmpty) return;
-      if (text.startsWith('http://') || text.startsWith('https://')) {
+      if (isPlayable(text)) {
         onPlay?.call(text);
       } else {
         onSay?.call(text);
