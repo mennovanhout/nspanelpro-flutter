@@ -8132,8 +8132,8 @@ class MdiIcons {
   static IconData get zodiacTaurus => iconMap['zodiacTaurus']!;
   static IconData get zodiacVirgo => iconMap['zodiacVirgo']!;
 
-  static toCamelCase(String str) {
-    RegExp exp = new RegExp(
+  static String toCamelCase(String str) {
+    RegExp exp = RegExp(
         r"[A-Z]{2,}(?=[A-Z][a-z]+[0-9]*|\b)|[A-Z]?[a-z]+[0-9]*|[A-Z]|[0-9]+");
     Iterable<Match> matches = exp.allMatches(str);
     if (matches.isEmpty) return '';
