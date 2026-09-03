@@ -8,10 +8,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Where Home Assistant is and how to prove who we are. Stored on the panel
 /// and nowhere else.
 class Settings {
-  Settings({required this.url, required this.token, this.dashboard = '', this.cachedConfig});
+  Settings({required this.url, required this.token, this.dashboard = '', this.cachedConfig, this.screensaver});
 
   String url;
   String token;
+
+  /// Panel-level screensaver settings from setup.json; a dashboard card
+  /// overrides them when present.
+  Map<String, dynamic>? screensaver;
 
   /// Lovelace url_path of the dashboard to render; empty = the default one.
   String dashboard;
@@ -24,6 +28,7 @@ class Settings {
   static const _kToken = 'token';
   static const _kDash = 'dashboard';
   static const _kCache = 'cached_config';
+  static const _kSaver = 'screensaver';
 
   /// Provisioning without a keyboard.
   ///
@@ -44,10 +49,23 @@ class Settings {
       final j = jsonDecode(await f.readAsString());
       await f.delete();
       if (j is! Map) return false;
-      final url = j['url']?.toString().trim() ?? '';
-      final token = j['token']?.toString().trim() ?? '';
+      // Partial: only the keys present are changed, so a file with just
+      // `screensaver` in it adjusts the screensaver and touches nothing else.
+      final current = await load();
+      final url = j['url']?.toString().trim() ?? current?.url ?? '';
+      final token = j['token']?.toString().trim() ?? current?.token ?? '';
       if (url.isEmpty || token.isEmpty) return false;
-      final s = Settings(url: url, token: token, dashboard: j['dashboard']?.toString().trim() ?? '');
+      final s = Settings(
+        url: url,
+        token: token,
+        dashboard: j.containsKey('dashboard')
+            ? (j['dashboard']?.toString().trim() ?? '')
+            : (current?.dashboard ?? ''),
+        cachedConfig: current?.cachedConfig,
+        screensaver: j.containsKey('screensaver')
+            ? (j['screensaver'] is Map ? (j['screensaver'] as Map).cast<String, dynamic>() : null)
+            : current?.screensaver,
+      );
       await s.save();
       return true;
     } catch (e) {
@@ -61,11 +79,21 @@ class Settings {
     final url = p.getString(_kUrl);
     final token = p.getString(_kToken);
     if (url == null || url.isEmpty || token == null || token.isEmpty) return null;
+    Map<String, dynamic>? saver;
+    final raw = p.getString(_kSaver);
+    if (raw != null) {
+      try {
+        saver = (jsonDecode(raw) as Map).cast<String, dynamic>();
+      } catch (_) {
+        saver = null;
+      }
+    }
     return Settings(
       url: url,
       token: token,
       dashboard: p.getString(_kDash) ?? '',
       cachedConfig: p.getString(_kCache),
+      screensaver: saver,
     );
   }
 
@@ -74,6 +102,11 @@ class Settings {
     await p.setString(_kUrl, url);
     await p.setString(_kToken, token);
     await p.setString(_kDash, dashboard);
+    if (screensaver == null) {
+      await p.remove(_kSaver);
+    } else {
+      await p.setString(_kSaver, jsonEncode(screensaver));
+    }
   }
 
   Future<void> cacheConfig(String json) async {
@@ -88,6 +121,7 @@ class Settings {
     await p.remove(_kToken);
     await p.remove(_kDash);
     await p.remove(_kCache);
+    await p.remove(_kSaver);
   }
 
   /// The dashboard's url_path, however it was typed. People paste what the

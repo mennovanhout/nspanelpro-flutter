@@ -50,6 +50,47 @@ views:
 Every card and option is documented in the cards repo's README; this app takes the same ones.
 Heights are in logical pixels, which on the panel at stock density are the panel's pixels.
 
+`vertical-stack`, `horizontal-stack` and `grid` are rendered as layout, nested as deep as you
+like. In a horizontal stack every child is an equal column and keeps its own `height`, so give
+them the same one. `grid` takes `columns`; `square` is ignored.
+
+## Screensaver
+
+After a period without a touch the panel shows a photo and a clock that wanders so nothing
+burns in. Any touch wakes it, and so does someone walking up to it - the NSPanel Pro has a
+real proximity sensor and the app reads it.
+
+Configure it with a card anywhere in the dashboard. It renders nothing (the web bundle ships a
+matching empty card, so Lovelace does not complain either); the app reads it and drops it:
+
+```yaml
+- type: custom:nspanel-screensaver
+  after: 300                  # seconds without a touch; default 300
+  image_url: https://mennovanhout.nl/r/62bcce7ed0807c94b3432152b3ba00a4
+  image_refresh: 600          # seconds between new pictures while idle; default 600
+  clock: true                 # default true
+  move_every: 60              # seconds between clock positions; default 60
+  frost: true                 # frosted panel behind the clock; default true
+  wake_on_proximity: true     # default true
+  proximity_delta: 12         # how far the reading must move from its resting level
+```
+
+The same keys also go under `screensaver` in a pushed `setup.json`, which is the right place
+when different panels want different pictures; the dashboard card wins when both exist.
+
+**Proximity.** The sensor reports a graded value at ~10 Hz, not near/far, and which way it moves
+when someone approaches depends on the unit. So by default the app takes the first two seconds
+of the screensaver as the resting level and wakes when a reading departs from it by
+`proximity_delta`. The setup screen (triple-tap the top-left corner) shows the live value; watch
+it as you walk up, and if you would rather be explicit, `proximity_below: 30` or
+`proximity_above: 90` wake on an absolute threshold instead.
+
+**The frosted clock is the one `BackdropFilter` in this app**, the exact thing the cards avoid
+on this GPU. It is affordable here because nothing else is happening: the blur re-rasterises
+only while the clock slides once a minute. `frost: false` if it ever stutters. Pictures are
+decoded at the panel's size, not the photo's, and the previous one is evicted before the next
+is fetched, so a stream of large photos does not grow memory.
+
 ## Install
 
 ```bash

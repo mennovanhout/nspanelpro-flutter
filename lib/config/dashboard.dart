@@ -72,11 +72,15 @@ List<CardConfig> _cardsOf(Map v) {
   ];
 }
 
-/// A vertical-stack is a page's worth of cards; anything else is one card.
+/// A page is a vertical stack, so a top-level vertical-stack unwraps into
+/// the page - one level only. Stacks nested inside it, and any horizontal
+/// stack or grid, stay whole and render as layout (see the registry).
+/// The screensaver card is config for the app, not a card, and is dropped.
 List<CardConfig> _flatten(CardConfig c) {
   final t = cardType(c);
-  if ((t == 'vertical-stack' || t == 'grid') && c['cards'] is List) {
-    return c.maps('cards').expand(_flatten).toList();
+  if (t == 'nspanel-screensaver') return const [];
+  if (t == 'vertical-stack' && c['cards'] is List) {
+    return c.maps('cards').where((x) => cardType(x) != 'nspanel-screensaver').toList();
   }
   return [c];
 }

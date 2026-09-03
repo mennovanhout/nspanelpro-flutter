@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../config/settings.dart';
+import '../util/proximity.dart';
 import 'theme.dart';
 
 /// Where is Home Assistant, and who are we. Shown once, and again on a
@@ -98,6 +99,18 @@ class _SetupScreenState extends State<SetupScreen> {
                 ),
                 onPressed: _save,
                 child: const Text('Connect'),
+              ),
+            ),
+            const SizedBox(height: 18),
+            // The proximity sensor, live, so you can watch what it does when
+            // you walk up and pick proximity_delta or an absolute threshold.
+            StreamBuilder<double>(
+              stream: Proximity.stream,
+              builder: (_, snap) => Text(
+                snap.hasError
+                    ? 'No proximity sensor on this device.'
+                    : 'Proximity sensor now: ${snap.data?.toStringAsFixed(0) ?? '…'}',
+                style: const TextStyle(color: Ns.muted, fontSize: 13, fontFeatures: Ns.tabular),
               ),
             ),
           ],

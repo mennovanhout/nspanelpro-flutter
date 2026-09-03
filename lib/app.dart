@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -5,13 +6,16 @@ import 'package:flutter/material.dart';
 import 'cards/env.dart';
 import 'cards/registry.dart';
 import 'config/dashboard.dart';
+import 'config/screensaver.dart';
 import 'config/settings.dart';
 import 'ha/connection.dart';
 import 'ha/states.dart';
 import 'ha/transport.dart';
 import 'ui/pager.dart';
+import 'ui/screensaver.dart';
 import 'ui/setup_screen.dart';
 import 'ui/theme.dart';
+import 'util/proximity.dart';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});
@@ -92,6 +96,19 @@ class _DashboardState extends State<Dashboard> {
   Future<void> Function()? _unsubLovelace;
   final _taps = <DateTime>[];
 
+  // screensaver: the dashboard card wins, then setup.json, then none
+  ScreensaverConfig? _saverFromDashboard;
+  bool _saving = false;
+  Timer? _idle;
+  StreamSubscription<double>? _prox;
+  final _proxBaseline = <double>[];
+
+  ScreensaverConfig? get _saver {
+    if (_saverFromDashboard != null) return _saverFromDashboard;
+    final m = widget.settings.screensaver;
+    return m == null ? null : ScreensaverConfig.fromMap(m);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -106,7 +123,9 @@ class _DashboardState extends State<Dashboard> {
     final cached = widget.settings.cachedConfig;
     if (cached != null) {
       try {
-        _pages = pagesFromLovelace((jsonDecode(cached) as Map).cast<String, dynamic>());
+        final cfg = (jsonDecode(cached) as Map).cast<String, dynamic>();
+        _pages = pagesFromLovelace(cfg);
+        _saverFromDashboard = ScreensaverConfig.findInLovelace(cfg);
       } catch (_) {
         // stale or unparsable cache; the fetch will fix it
       }
@@ -115,10 +134,13 @@ class _DashboardState extends State<Dashboard> {
     _conn.onReady = _loadConfig;
     _conn.status.addListener(_onStatus);
     _conn.start();
+    _armIdle();
   }
 
   @override
   void dispose() {
+    _idle?.cancel();
+    _prox?.cancel();
     _conn.status.removeListener(_onStatus);
     _unsubLovelace?.call();
     _conn.dispose();
@@ -139,6 +161,7 @@ class _DashboardState extends State<Dashboard> {
       if (!mounted) return;
       setState(() {
         _pages = pages;
+        _saverFromDashboard = ScreensaverConfig.findInLovelace(cfg);
         _error = pages.isEmpty
             ? 'The dashboard "${path.isEmpty ? 'default' : path}" has no cards this app can '
                 'draw. It needs custom:nspanel-* cards.'
@@ -193,11 +216,69 @@ class _DashboardState extends State<Dashboard> {
     }
   }
 
+  // ---- idle / screensaver -------------------------------------------------
+
+  void _armIdle() {
+    _idle?.cancel();
+    final s = _saver;
+    if (s == null) return;
+    _idle = Timer(Duration(seconds: s.afterSeconds.clamp(10, 86400)), _sleep);
+  }
+
+  void _touched() {
+    if (_saving) return; // the overlay handles its own wake
+    _armIdle();
+  }
+
+  void _sleep() {
+    if (!mounted || _saver == null) return;
+    setState(() => _saving = true);
+    _watchProximity();
+  }
+
+  void _wake() {
+    _prox?.cancel();
+    _prox = null;
+    _proxBaseline.clear();
+    if (mounted) setState(() => _saving = false);
+    _armIdle();
+  }
+
+  /// Wake on approach. The sensor reports a graded value, and which way it
+  /// moves when someone walks up depends on the unit, so the first two
+  /// seconds of readings set the resting level and a departure from it by
+  /// `proximity_delta` wakes the panel. Absolute below/above overrides exist
+  /// for anyone who has watched the readout and knows.
+  void _watchProximity() {
+    final s = _saver;
+    if (s == null || !s.wakeOnProximity) return;
+    _proxBaseline.clear();
+    _prox = Proximity.stream.listen((v) {
+      if (s.proximityBelow != null && v < s.proximityBelow!) return _wake();
+      if (s.proximityAbove != null && v > s.proximityAbove!) return _wake();
+      if (s.proximityBelow != null || s.proximityAbove != null) return;
+      if (_proxBaseline.length < 20) {
+        _proxBaseline.add(v);
+        return;
+      }
+      final sorted = [..._proxBaseline]..sort();
+      final median = sorted[sorted.length ~/ 2];
+      if ((v - median).abs() > s.proximityDelta) _wake();
+    }, onError: (_) {
+      // no sensor on this device; touch still wakes it
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Listener(
-        onPointerDown: (e) => _cornerTap(TapDownDetails(globalPosition: e.position)),
+        onPointerDown: (e) {
+          _touched();
+          _cornerTap(TapDownDetails(globalPosition: e.position));
+        },
+        onPointerMove: (_) => _touched(),
+        onPointerUp: (_) => _touched(),
         child: Stack(
           children: [
             if (_pages.isNotEmpty)
@@ -233,6 +314,8 @@ class _DashboardState extends State<Dashboard> {
                   child: Text(_error!, style: const TextStyle(color: Ns.danger, fontSize: 12)),
                 ),
               ),
+            if (_saving && _saver != null)
+              Positioned.fill(child: Screensaver(config: _saver!, onWake: _wake)),
             Positioned(
               top: 6,
               right: 8,

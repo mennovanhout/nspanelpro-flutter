@@ -38,6 +38,79 @@ void main() {
     expect(cardType(pages[2].cards[0]), 'nspanel-clock-card');
   });
 
+  test('a horizontal-stack stays whole for the registry to lay out', () {
+    final pages = pagesFromLovelace({
+      'views': [
+        {
+          'cards': [
+            {
+              'type': 'vertical-stack',
+              'cards': [
+                {
+                  'type': 'horizontal-stack',
+                  'cards': [
+                    {'type': 'custom:nspanel-sensor-card', 'entity': 'sensor.a'},
+                    {'type': 'custom:nspanel-sensor-card', 'entity': 'sensor.b'},
+                  ],
+                },
+                {'type': 'custom:nspanel-clock-card'},
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(pages.length, 1);
+    expect(pages[0].cards.length, 2);
+    expect(cardType(pages[0].cards[0]), 'horizontal-stack');
+    expect(pages[0].cards[0].maps('cards').length, 2);
+  });
+
+  test('a nested vertical-stack is kept for the registry, not flattened twice', () {
+    final pages = pagesFromLovelace({
+      'views': [
+        {
+          'cards': [
+            {
+              'type': 'vertical-stack',
+              'cards': [
+                {
+                  'type': 'vertical-stack',
+                  'cards': [
+                    {'type': 'custom:nspanel-clock-card'},
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(pages[0].cards.length, 1);
+    expect(cardType(pages[0].cards[0]), 'vertical-stack');
+  });
+
+  test('the screensaver card is config, not a card, and never reaches a page', () {
+    final pages = pagesFromLovelace({
+      'views': [
+        {
+          'cards': [
+            {'type': 'custom:nspanel-screensaver', 'after': 120},
+            {
+              'type': 'vertical-stack',
+              'cards': [
+                {'type': 'custom:nspanel-clock-card'},
+                {'type': 'custom:nspanel-screensaver'},
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    expect(pages.length, 1);
+    expect(pages[0].cards.map(cardType), ['nspanel-clock-card']);
+  });
+
   test('a plain view with no swipe card is one page, stacks flattened', () {
     final pages = pagesFromLovelace({
       'views': [
