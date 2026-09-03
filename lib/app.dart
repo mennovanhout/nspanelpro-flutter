@@ -3,8 +3,12 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
+import 'audio/announcer.dart';
 import 'cards/env.dart';
 import 'cards/registry.dart';
+import 'mqtt/bridge.dart';
+import 'mqtt/client.dart';
+import 'util/device.dart';
 import 'config/dashboard.dart';
 import 'config/screensaver.dart';
 import 'config/settings.dart';
@@ -17,6 +21,10 @@ import 'ui/screensaver.dart';
 import 'ui/setup_screen.dart';
 import 'ui/theme.dart';
 import 'util/proximity.dart';
+
+/// Reported to Home Assistant as the device's sw_version. Keep in step with
+/// pubspec.yaml.
+const appVersion = '0.2.0';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});
@@ -111,6 +119,7 @@ class _DashboardState extends State<Dashboard> {
   final _proxBaseline = <double>[];
 
   ScreensaverConfig? get _saver {
+    if (_forcedSaver != null) return _forcedSaver;
     if (_saverFromDashboard != null) return _saverFromDashboard;
     final m = widget.settings.screensaver;
     return m == null ? null : ScreensaverConfig.fromMap(m);
@@ -142,10 +151,86 @@ class _DashboardState extends State<Dashboard> {
     _conn.status.addListener(_onStatus);
     _conn.start();
     _armIdle();
+    _announcer = Announcer(settings: widget.settings, conn: _conn);
+    if (widget.settings.hasMqtt) _startBridge();
+  }
+
+  // ---- the panel as a Home Assistant device, over MQTT ---------------------
+
+  late final Announcer _announcer;
+  PanelBridge? _bridge;
+  MqttClient? _mqtt;
+  final _pageJump = ValueNotifier<int>(0);
+  StreamSubscription<double>? _proxAlways, _lightSub;
+  Timer? _diag;
+
+  Future<void> _startBridge() async {
+    final s = widget.settings;
+    final id = await Device.androidId();
+    if (!mounted) return;
+    final base = 'nspanel/$id';
+    _mqtt = MqttClient(
+      transportFactory: () => SocketMqttTransport.connect(s.mqttHost, s.mqttPort),
+      clientId: 'nspanel-$id',
+      username: s.mqttUser,
+      password: s.mqttPass,
+      willTopic: '$base/availability',
+      willMessage: 'offline',
+    );
+    final b = PanelBridge(
+      mqtt: _mqtt!,
+      deviceId: id,
+      name: s.name,
+      version: appVersion,
+      presenceDelta: _saver?.proximityDelta ?? 12,
+      onBrightness: (v) async {
+        if (await Device.setBrightness(v)) _bridge?.brightness(v);
+      },
+      onVolume: (v) async {
+        if (await Device.setVolume(v)) _bridge?.volume(v);
+      },
+      onScreensaver: (on) => on ? _sleep(force: true) : _wake(),
+      onPage: (i) => _pageJump.value = i,
+      onSay: _announcer.say,
+      onPlay: _announcer.play,
+      onStop: _announcer.stop,
+    );
+    _bridge = b;
+    _mqtt!.connected.addListener(() {
+      debugPrint('mqtt: ${_mqtt!.connected.value ? 'connected, device announced' : 'disconnected'}');
+    });
+    b.start();
+
+    // sensors, continuously, rate-limited in the bridge
+    _proxAlways = Proximity.stream.listen(b.proximity, onError: (_) {});
+    _lightSub = Device.light.listen(b.illuminance, onError: (_) {});
+    b.screensaver(_saving);
+    b.page(0);
+    _publishDiagnostics();
+    _diag = Timer.periodic(const Duration(seconds: 60), (_) => _publishDiagnostics());
+  }
+
+  Future<void> _publishDiagnostics() async {
+    final b = _bridge;
+    if (b == null) return;
+    final rssi = await Device.wifiRssi();
+    if (rssi != null) b.rssi(rssi);
+    final t = await Device.socTemperature();
+    if (t != null) b.temperature(t);
+    final br = await Device.brightness();
+    if (br != null && br >= 0) b.brightness(br);
+    final vol = await Device.volume();
+    if (vol != null) b.volume(vol);
   }
 
   @override
   void dispose() {
+    _diag?.cancel();
+    _proxAlways?.cancel();
+    _lightSub?.cancel();
+    _mqtt?.dispose();
+    _announcer.dispose();
+    _pageJump.dispose();
     _idle?.cancel();
     _prox?.cancel();
     _conn.status.removeListener(_onStatus);
@@ -233,6 +318,7 @@ class _DashboardState extends State<Dashboard> {
   }
 
   void _touched() {
+    _bridge?.touched();
     if (_saving) return; // the overlay handles its own wake
     _armIdle();
   }
@@ -241,12 +327,21 @@ class _DashboardState extends State<Dashboard> {
   // while it fades out, so the dashboard is touchable the moment it starts.
   bool _saverMounted = false;
 
-  void _sleep() {
-    if (!mounted || _saver == null) return;
+  /// `force` is Home Assistant switching the screensaver on: it works even
+  /// with none configured, as a clock on black.
+  ScreensaverConfig? _forcedSaver;
+
+  void _sleep({bool force = false}) {
+    if (!mounted) return;
+    if (_saver == null) {
+      if (!force) return;
+      _forcedSaver = const ScreensaverConfig();
+    }
     setState(() {
       _saving = true;
       _saverMounted = true;
     });
+    _bridge?.screensaver(true);
     _watchProximity();
   }
 
@@ -255,6 +350,8 @@ class _DashboardState extends State<Dashboard> {
     _prox = null;
     _proxBaseline.clear();
     if (mounted && _saving) setState(() => _saving = false);
+    _forcedSaver = null;
+    _bridge?.screensaver(false);
     _armIdle();
   }
 
@@ -296,7 +393,7 @@ class _DashboardState extends State<Dashboard> {
         child: Stack(
           children: [
             if (_pages.isNotEmpty)
-              PanelPager(pages: [
+              PanelPager(jump: _pageJump, onPage: (i) => _bridge?.page(i), pages: [
                 for (final p in _pages)
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,

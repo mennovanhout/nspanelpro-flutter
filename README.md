@@ -132,6 +132,61 @@ the Mali-G31, switch the renderer off Impeller in `AndroidManifest.xml`:
 <meta-data android:name="io.flutter.embedding.android.EnableImpeller" android:value="false"/>
 ```
 
+## The panel as a Home Assistant device
+
+Give the app your MQTT broker and it registers itself through MQTT discovery: one device,
+"NSPanel Dining" or whatever you name it, with these entities.
+
+| Entity | What |
+| --- | --- |
+| `sensor` Proximity | the graded reading, once a second at most |
+| `binary_sensor` Presence | somebody at the panel, from a learned resting level (`proximity_delta`) |
+| `sensor` Illuminance | lux, from the light sensor |
+| `binary_sensor` Screensaver | whether the wallpaper is showing right now |
+| `switch` Screensaver | put the panel to sleep or wake it from an automation |
+| `number` Page | which page is showing; set it to turn the page |
+| `number` Screen brightness | 0–255 |
+| `number` Volume | speaker, 0–100 |
+| `notify` Announce | `notify.send_message`: text is spoken, a URL is played |
+| `button` Stop audio | |
+| Wi-Fi signal, SoC temperature, app version, last touch | diagnostics |
+
+Availability is an MQTT will, so the device goes unavailable the moment the panel drops off.
+
+Configure it in `setup.json` (the token line can be left out when it is already stored):
+
+```json
+{
+  "name": "NSPanel Dining",
+  "mqtt": { "host": "10.0.0.2", "port": 1883, "username": "mqtt", "password": "YOUR-MQTT-PASSWORD" },
+  "tts_engine": ""
+}
+```
+
+or on the setup screen. The MQTT client is hand-rolled and QoS 0 with retained state, tested
+against a fake broker the same way the HA client is.
+
+**Announcements.** `notify.send_message` with a message speaks it: the app asks Home
+Assistant's own TTS engine for the audio (`/api/tts_get_url`), so the voice is whichever you
+have configured, and nothing is synthesised on the panel. Leave `tts_engine` empty to use the
+first engine HA lists, or name one, e.g. `tts.google_en_com`. A message that is a URL is
+played instead. Automations can also publish straight to `nspanel/<id>/say/set`, as text or
+as `{"url": "..."}`.
+
+**Screen brightness** needs the `WRITE_SETTINGS` permission, which Android grants only by a
+one-time toggle on the panel - or from your desk:
+
+```bash
+adb shell appops set nl.mennovanhout.nspanel WRITE_SETTINGS allow
+```
+
+Until it is granted, the brightness entity reads but does not write.
+
+There is no MQTT `media_player` platform in Home Assistant, so this does not make the panel
+one; announcements, chimes and a volume slider are what a small mono speaker is for. A real
+`media_player` entity would come from a DLNA renderer inside the app, which HA discovers on
+its own - a separate piece of work.
+
 ## Motion
 
 Four moments animate, and only those: cards rise into place when a page first shows (fade

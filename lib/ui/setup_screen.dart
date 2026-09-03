@@ -19,6 +19,10 @@ class SetupScreen extends StatefulWidget {
 class _SetupScreenState extends State<SetupScreen> {
   late final _url = TextEditingController(text: widget.initial?.url ?? 'http://homeassistant.local:8123');
   late final _dash = TextEditingController(text: widget.initial?.dashboard ?? '');
+  late final _name = TextEditingController(text: widget.initial?.name ?? 'NSPanel');
+  late final _mqttHost = TextEditingController(text: widget.initial?.mqttHost ?? '');
+  late final _mqttUser = TextEditingController(text: widget.initial?.mqttUser ?? '');
+  final _mqttPass = TextEditingController();
   final _token = TextEditingController();
   String? _err;
 
@@ -30,9 +34,9 @@ class _SetupScreenState extends State<SetupScreen> {
 
   @override
   void dispose() {
-    _url.dispose();
-    _dash.dispose();
-    _token.dispose();
+    for (final c in [_url, _dash, _name, _mqttHost, _mqttUser, _mqttPass, _token]) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -42,7 +46,28 @@ class _SetupScreenState extends State<SetupScreen> {
       setState(() => _err = 'Both the URL and a token are needed.');
       return;
     }
-    final s = Settings(url: _url.text.trim(), token: token, dashboard: _dash.text.trim());
+    final host = _mqttHost.text.trim();
+    Map<String, dynamic>? mqtt;
+    if (host.isNotEmpty) {
+      // host[:port]; an empty password keeps the stored one
+      final parts = host.split(':');
+      mqtt = {
+        'host': parts.first,
+        'port': parts.length > 1 ? int.tryParse(parts[1]) ?? 1883 : 1883,
+        'username': _mqttUser.text.trim(),
+        'password': _mqttPass.text.isEmpty ? (widget.initial?.mqttPass ?? '') : _mqttPass.text,
+      };
+    }
+    final s = Settings(
+      url: _url.text.trim(),
+      token: token,
+      dashboard: _dash.text.trim(),
+      cachedConfig: widget.initial?.cachedConfig,
+      screensaver: widget.initial?.screensaver,
+      mqtt: mqtt,
+      name: _name.text.trim().isEmpty ? 'NSPanel' : _name.text.trim(),
+      ttsEngine: widget.initial?.ttsEngine ?? '',
+    );
     s.save().then((_) => widget.onSaved(s));
   }
 
@@ -82,6 +107,33 @@ class _SetupScreenState extends State<SetupScreen> {
             const Text('Dashboard (url path, empty = default)', style: TextStyle(color: Ns.muted, fontSize: 13)),
             const SizedBox(height: 6),
             TextField(controller: _dash, decoration: field.copyWith(hintText: 'e.g. nspanel')),
+            const SizedBox(height: 16),
+            const Text('Device name in Home Assistant', style: TextStyle(color: Ns.muted, fontSize: 13)),
+            const SizedBox(height: 6),
+            TextField(controller: _name, decoration: field.copyWith(hintText: 'NSPanel Dining')),
+            const SizedBox(height: 12),
+            const Text('MQTT broker (host or host:port, empty = no device)',
+                style: TextStyle(color: Ns.muted, fontSize: 13)),
+            const SizedBox(height: 6),
+            TextField(
+                controller: _mqttHost,
+                keyboardType: TextInputType.url,
+                decoration: field.copyWith(hintText: 'e.g. 10.0.0.2 or homeassistant.local:1883')),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                child: TextField(
+                    controller: _mqttUser, decoration: field.copyWith(hintText: 'MQTT user')),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: TextField(
+                    controller: _mqttPass,
+                    obscureText: true,
+                    decoration: field.copyWith(
+                        hintText: widget.initial?.mqttPass != null ? 'password (kept)' : 'MQTT password')),
+              ),
+            ]),
             const SizedBox(height: 10),
             SizedBox(
               height: 18,

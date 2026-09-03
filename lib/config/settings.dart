@@ -8,7 +8,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Where Home Assistant is and how to prove who we are. Stored on the panel
 /// and nowhere else.
 class Settings {
-  Settings({required this.url, required this.token, this.dashboard = '', this.cachedConfig, this.screensaver});
+  Settings({
+    required this.url,
+    required this.token,
+    this.dashboard = '',
+    this.cachedConfig,
+    this.screensaver,
+    this.mqtt,
+    this.name = 'NSPanel',
+    this.ttsEngine = '',
+  });
 
   String url;
   String token;
@@ -16,6 +25,21 @@ class Settings {
   /// Panel-level screensaver settings from setup.json; a dashboard card
   /// overrides them when present.
   Map<String, dynamic>? screensaver;
+
+  /// {host, port, username, password}. Null = no MQTT, no HA device.
+  Map<String, dynamic>? mqtt;
+
+  /// What the device is called in Home Assistant.
+  String name;
+
+  /// e.g. tts.google_en_com; empty = whichever engine HA lists first.
+  String ttsEngine;
+
+  String get mqttHost => mqtt?['host']?.toString().trim() ?? '';
+  int get mqttPort => (mqtt?['port'] as num?)?.toInt() ?? 1883;
+  String? get mqttUser => (mqtt?['username']?.toString().trim().isEmpty ?? true) ? null : mqtt!['username'].toString().trim();
+  String? get mqttPass => (mqtt?['password']?.toString().isEmpty ?? true) ? null : mqtt!['password'].toString();
+  bool get hasMqtt => mqttHost.isNotEmpty;
 
   /// Lovelace url_path of the dashboard to render; empty = the default one.
   String dashboard;
@@ -29,6 +53,19 @@ class Settings {
   static const _kDash = 'dashboard';
   static const _kCache = 'cached_config';
   static const _kSaver = 'screensaver';
+  static const _kMqtt = 'mqtt';
+  static const _kName = 'name';
+  static const _kTts = 'tts_engine';
+
+  static Map<String, dynamic>? _map(SharedPreferences p, String key) {
+    final raw = p.getString(key);
+    if (raw == null) return null;
+    try {
+      return (jsonDecode(raw) as Map).cast<String, dynamic>();
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Provisioning without a keyboard.
   ///
@@ -65,6 +102,11 @@ class Settings {
         screensaver: j.containsKey('screensaver')
             ? (j['screensaver'] is Map ? (j['screensaver'] as Map).cast<String, dynamic>() : null)
             : current?.screensaver,
+        mqtt: j.containsKey('mqtt')
+            ? (j['mqtt'] is Map ? (j['mqtt'] as Map).cast<String, dynamic>() : null)
+            : current?.mqtt,
+        name: j['name']?.toString().trim() ?? current?.name ?? 'NSPanel',
+        ttsEngine: j['tts_engine']?.toString().trim() ?? current?.ttsEngine ?? '',
       );
       await s.save();
       return true;
@@ -79,21 +121,15 @@ class Settings {
     final url = p.getString(_kUrl);
     final token = p.getString(_kToken);
     if (url == null || url.isEmpty || token == null || token.isEmpty) return null;
-    Map<String, dynamic>? saver;
-    final raw = p.getString(_kSaver);
-    if (raw != null) {
-      try {
-        saver = (jsonDecode(raw) as Map).cast<String, dynamic>();
-      } catch (_) {
-        saver = null;
-      }
-    }
     return Settings(
       url: url,
       token: token,
       dashboard: p.getString(_kDash) ?? '',
       cachedConfig: p.getString(_kCache),
-      screensaver: saver,
+      screensaver: _map(p, _kSaver),
+      mqtt: _map(p, _kMqtt),
+      name: p.getString(_kName) ?? 'NSPanel',
+      ttsEngine: p.getString(_kTts) ?? '',
     );
   }
 
@@ -102,10 +138,14 @@ class Settings {
     await p.setString(_kUrl, url);
     await p.setString(_kToken, token);
     await p.setString(_kDash, dashboard);
-    if (screensaver == null) {
-      await p.remove(_kSaver);
-    } else {
-      await p.setString(_kSaver, jsonEncode(screensaver));
+    await p.setString(_kName, name);
+    await p.setString(_kTts, ttsEngine);
+    for (final e in {_kSaver: screensaver, _kMqtt: mqtt}.entries) {
+      if (e.value == null) {
+        await p.remove(e.key);
+      } else {
+        await p.setString(e.key, jsonEncode(e.value));
+      }
     }
   }
 
@@ -122,6 +162,9 @@ class Settings {
     await p.remove(_kDash);
     await p.remove(_kCache);
     await p.remove(_kSaver);
+    await p.remove(_kMqtt);
+    await p.remove(_kName);
+    await p.remove(_kTts);
   }
 
   /// The dashboard's url_path, however it was typed. People paste what the

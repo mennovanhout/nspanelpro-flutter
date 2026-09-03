@@ -6,8 +6,12 @@ import 'theme.dart';
 /// cards' vertical one settle it in the gesture arena, which is the same
 /// axis-lock the web cards do by hand.
 class PanelPager extends StatefulWidget {
-  const PanelPager({super.key, required this.pages});
+  const PanelPager({super.key, required this.pages, this.jump, this.onPage});
   final List<Widget> pages;
+
+  /// Set a page index here and the pager goes there - how HA turns the page.
+  final ValueNotifier<int>? jump;
+  final ValueChanged<int>? onPage;
 
   @override
   State<PanelPager> createState() => _PanelPagerState();
@@ -15,6 +19,26 @@ class PanelPager extends StatefulWidget {
 
 class _PanelPagerState extends State<PanelPager> {
   int _index = 0;
+  final _controller = PageController();
+
+  @override
+  void initState() {
+    super.initState();
+    widget.jump?.addListener(_onJump);
+  }
+
+  @override
+  void dispose() {
+    widget.jump?.removeListener(_onJump);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onJump() {
+    final i = widget.jump!.value.clamp(0, widget.pages.length - 1);
+    if (!_controller.hasClients || i == _index) return;
+    _controller.animateToPage(i, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +46,12 @@ class _PanelPagerState extends State<PanelPager> {
     return Stack(
       children: [
         PageView.builder(
+          controller: _controller,
           itemCount: widget.pages.length,
-          onPageChanged: (i) => setState(() => _index = i),
+          onPageChanged: (i) {
+            setState(() => _index = i);
+            widget.onPage?.call(i);
+          },
           itemBuilder: (_, i) => Padding(
             padding: EdgeInsets.fromLTRB(Ns.gap, Ns.gap, Ns.gap, many ? 26 : Ns.gap),
             child: widget.pages[i],
