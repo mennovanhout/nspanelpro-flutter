@@ -53,6 +53,10 @@ views:
 Every card and option is documented in the cards repo's README; this app takes the same ones.
 Heights are in logical pixels, which on the panel at stock density are the panel's pixels.
 
+The switch card is the button card's sibling for switches, input booleans and fans: each tile
+is lit while its entity is on, and a tap turns it the other way, echoed at once for
+`echo_ms` so the tile never shows the old state under a finger.
+
 The alarm card is the one with a keypad: when the alarm wants a code, arming or disarming
 opens one full screen, and a refused code says so and clears. It rings the built-in
 `armed`, `disarmed` and `alarm` sounds as the state changes (`sounds: false` to stop it).
@@ -361,7 +365,7 @@ websocket client is a port of the one verified against a fake HA in the cards re
 tested the same way here (`flutter test`).
 
 Not here: Home Assistant's more-info dialog. Where the web cards open it, this app opens the
-card's own sheet (climate) or does nothing (read-only cards). And only these eleven card
+card's own sheet (climate) or does nothing (read-only cards). And only these twelve card
 types render; this is a panel, not a browser.
 
 ## Layout

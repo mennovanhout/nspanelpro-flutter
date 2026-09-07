@@ -68,6 +68,14 @@ class FakeHa implements HaTransport {
           }
           push(id);
         }
+        // switches and the like: turn_on / turn_off / toggle from any domain, a beat later
+        if (id != null && states[id] != null && const ['homeassistant', 'switch', 'input_boolean', 'fan'].contains(msg['domain'])) {
+          final s = states[id]!;
+          if (msg['service'] == 'turn_on') s['state'] = 'on';
+          if (msg['service'] == 'turn_off') s['state'] = 'off';
+          if (msg['service'] == 'toggle') s['state'] = s['state'] == 'on' ? 'off' : 'on';
+          Timer(const Duration(milliseconds: 50), () => push(id));
+        }
         if (id != null && states[id] != null && msg['domain'] == 'alarm_control_panel') {
           final s = states[id]!;
           s['state'] = msg['service'] == 'alarm_disarm'
