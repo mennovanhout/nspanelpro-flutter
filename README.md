@@ -82,7 +82,13 @@ matching empty card, so Lovelace does not complain either); the app reads it and
   image_fit: contain          # the whole picture, its own shape, black around it (default);
                               # `cover` fills the screen and crops
   clock: true                 # default true
-  move_every: 60              # seconds between clock positions; default 60
+  clock_position: wander      # `wander` (default) moves it every `move_every` seconds;
+                              # or a fixed spot: center, top-left, top, top-right, left,
+                              # right, bottom-left, bottom, bottom-right
+  clock_size: 64              # height of the digits in px, 24-160; the date and the
+                              # panel scale with it
+  clock_date: true            # the day and date under the time; default true
+  move_every: 60              # seconds between clock positions while it wanders; default 60
   frost: true                 # frosted panel behind the clock; default true
   wake_on_proximity: true     # default true
   proximity_delta: 12         # how far the reading must move from its resting level
@@ -90,6 +96,10 @@ matching empty card, so Lovelace does not complain either); the app reads it and
 
 The same keys also go under `screensaver` in a pushed `setup.json`, which is the right place
 when different panels want different pictures; the dashboard card wins when both exist.
+
+The clock wanders by default so that nothing sits on the same pixels all night. A fixed
+`clock_position` is the choice when the photo has a spot for it; the panel's LCD does not
+burn in the way an OLED would, so the wandering is a precaution rather than a necessity.
 
 **Proximity.** The sensor reports a graded value at ~10 Hz, not near/far, and which way it moves
 when someone approaches depends on the unit. Its resting level depends on the wall it hangs on

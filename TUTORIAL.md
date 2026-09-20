@@ -287,7 +287,8 @@ file on your computer and into the panel's own storage.
 You already configured it in step 2 — the `custom:nspanel-screensaver` card. After `after`
 seconds without a touch the panel shows a photo from `image_url` (any URL that returns an
 image; one that returns a random image each time is ideal) with a clock that wanders so
-nothing burns in. A touch wakes it, and so does walking up to it: the panel's proximity
+nothing burns in — or sits still at `clock_position: bottom-right`, as big as `clock_size`
+says. A touch wakes it, and so does walking up to it: the panel's proximity
 sensor is real. If you would rather keep it panel-specific, the same keys go under
 `"screensaver": { ... }` in `setup.json`; the dashboard card wins when both exist.
 

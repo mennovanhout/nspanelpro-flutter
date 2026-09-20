@@ -1,20 +1,34 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nspanel_app/config/screensaver.dart';
 
 void main() {
-  test('defaults: five minutes, clock on, frost on, proximity on, no image', () {
-    final s = ScreensaverConfig.fromMap({});
-    expect(s.afterSeconds, 300);
-    expect(s.imageUrl, isNull);
-    expect(s.imageFit, 'contain');
-    expect(ScreensaverConfig.fromMap({'image_fit': 'cover'}).imageFit, 'cover');
-    expect(ScreensaverConfig.fromMap({'image_fit': 'stretch'}).imageFit, 'contain');
-    expect(s.clock, isTrue);
-    expect(s.frost, isTrue);
-    expect(s.wakeOnProximity, isTrue);
-    expect(s.proximityDelta, 12);
-    expect(s.proximityBelow, isNull);
-  });
+  test(
+    'defaults: five minutes, clock on, frost on, proximity on, no image',
+    () {
+      final s = ScreensaverConfig.fromMap({});
+      expect(s.afterSeconds, 300);
+      expect(s.imageUrl, isNull);
+      expect(s.imageFit, 'contain');
+      expect(
+        ScreensaverConfig.fromMap({'image_fit': 'cover'}).imageFit,
+        'cover',
+      );
+      expect(
+        ScreensaverConfig.fromMap({'image_fit': 'stretch'}).imageFit,
+        'contain',
+      );
+      expect(s.clock, isTrue);
+      expect(s.clockPosition, 'wander');
+      expect(s.clockWanders, isTrue);
+      expect(s.clockSize, 64);
+      expect(s.clockDate, isTrue);
+      expect(s.frost, isTrue);
+      expect(s.wakeOnProximity, isTrue);
+      expect(s.proximityDelta, 12);
+      expect(s.proximityBelow, isNull);
+    },
+  );
 
   test('reads the card options', () {
     final s = ScreensaverConfig.fromMap({
@@ -23,6 +37,9 @@ void main() {
       'image_refresh': 300,
       'move_every': 30,
       'frost': false,
+      'clock_position': 'bottom-right',
+      'clock_size': 96,
+      'clock_date': false,
       'wake_on_proximity': false,
       'proximity_below': 40,
     });
@@ -31,6 +48,21 @@ void main() {
     expect(s.imageRefreshSeconds, 300);
     expect(s.moveSeconds, 30);
     expect(s.frost, isFalse);
+    expect(s.clockPosition, 'bottom-right');
+    expect(s.clockWanders, isFalse);
+    expect(
+      ScreensaverConfig.clockSpots[s.clockPosition],
+      const Alignment(0.8, 0.8),
+    );
+    expect(s.clockSize, 96);
+    expect(s.clockDate, isFalse);
+    // an unknown spot wanders; the size is kept readable
+    expect(
+      ScreensaverConfig.fromMap({'clock_position': 'middle'}).clockWanders,
+      isTrue,
+    );
+    expect(ScreensaverConfig.fromMap({'clock_size': 4}).clockSize, 24);
+    expect(ScreensaverConfig.fromMap({'clock_size': 900}).clockSize, 160);
     expect(s.wakeOnProximity, isFalse);
     expect(s.proximityBelow, 40);
   });
@@ -48,7 +80,11 @@ void main() {
                   'type': 'vertical-stack',
                   'cards': [
                     {'type': 'custom:nspanel-light-card', 'entity': 'light.a'},
-                    {'type': 'custom:nspanel-screensaver', 'after': 90, 'image_url': 'u'},
+                    {
+                      'type': 'custom:nspanel-screensaver',
+                      'after': 90,
+                      'image_url': 'u',
+                    },
                   ],
                 },
               ],

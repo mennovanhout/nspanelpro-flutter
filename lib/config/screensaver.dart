@@ -1,3 +1,5 @@
+import 'package:flutter/widgets.dart';
+
 import 'dashboard.dart';
 
 /// What the panel does when nobody has touched it for a while.
@@ -12,6 +14,9 @@ class ScreensaverConfig {
     this.imageRefreshSeconds = 600,
     this.imageFit = 'contain',
     this.clock = true,
+    this.clockPosition = 'wander',
+    this.clockSize = 64,
+    this.clockDate = true,
     this.moveSeconds = 60,
     this.frost = true,
     this.wakeOnProximity = true,
@@ -28,7 +33,30 @@ class ScreensaverConfig {
   /// `cover`: fill the screen and crop.
   final String imageFit;
   final bool clock;
+
+  /// `wander` (a new random spot every [moveSeconds]), or one of the nine
+  /// fixed spots in [clockSpots]. A fixed clock never moves.
+  final String clockPosition;
+
+  /// Height of the digits in logical pixels; the date and the panel around
+  /// it scale with it.
+  final double clockSize;
+  final bool clockDate;
   final int moveSeconds;
+
+  static const clockSpots = {
+    'center': Alignment.center,
+    'top-left': Alignment(-0.8, -0.8),
+    'top': Alignment(0, -0.8),
+    'top-right': Alignment(0.8, -0.8),
+    'left': Alignment(-0.8, 0),
+    'right': Alignment(0.8, 0),
+    'bottom-left': Alignment(-0.8, 0.8),
+    'bottom': Alignment(0, 0.8),
+    'bottom-right': Alignment(0.8, 0.8),
+  };
+
+  bool get clockWanders => !clockSpots.containsKey(clockPosition);
   final bool frost;
 
   /// Wake when the proximity reading moves away from its resting level by
@@ -44,18 +72,27 @@ class ScreensaverConfig {
   static const cardTypeName = 'nspanel-screensaver';
 
   static ScreensaverConfig fromMap(Map<String, dynamic> m) => ScreensaverConfig(
-        afterSeconds: (m['after'] as num?)?.toInt() ?? 300,
-        imageUrl: m['image_url']?.toString(),
-        imageRefreshSeconds: (m['image_refresh'] as num?)?.toInt() ?? 600,
-        imageFit: m['image_fit'] == 'cover' ? 'cover' : 'contain',
-        clock: m['clock'] is bool ? m['clock'] as bool : true,
-        moveSeconds: (m['move_every'] as num?)?.toInt() ?? 60,
-        frost: m['frost'] is bool ? m['frost'] as bool : true,
-        wakeOnProximity: m['wake_on_proximity'] is bool ? m['wake_on_proximity'] as bool : true,
-        proximityDelta: (m['proximity_delta'] as num?)?.toDouble() ?? 12,
-        proximityBelow: (m['proximity_below'] as num?)?.toDouble(),
-        proximityAbove: (m['proximity_above'] as num?)?.toDouble(),
-      );
+    afterSeconds: (m['after'] as num?)?.toInt() ?? 300,
+    imageUrl: m['image_url']?.toString(),
+    imageRefreshSeconds: (m['image_refresh'] as num?)?.toInt() ?? 600,
+    imageFit: m['image_fit'] == 'cover' ? 'cover' : 'contain',
+    clock: m['clock'] is bool ? m['clock'] as bool : true,
+    clockPosition: clockSpots.containsKey(m['clock_position'])
+        ? m['clock_position'] as String
+        : 'wander',
+    clockSize: ((m['clock_size'] as num?)?.toDouble() ?? 64)
+        .clamp(24, 160)
+        .toDouble(),
+    clockDate: m['clock_date'] is bool ? m['clock_date'] as bool : true,
+    moveSeconds: (m['move_every'] as num?)?.toInt() ?? 60,
+    frost: m['frost'] is bool ? m['frost'] as bool : true,
+    wakeOnProximity: m['wake_on_proximity'] is bool
+        ? m['wake_on_proximity'] as bool
+        : true,
+    proximityDelta: (m['proximity_delta'] as num?)?.toDouble() ?? 12,
+    proximityBelow: (m['proximity_below'] as num?)?.toDouble(),
+    proximityAbove: (m['proximity_above'] as num?)?.toDouble(),
+  );
 
   /// The screensaver card, wherever it is in the dashboard - a view, a stack,
   /// a swipe card, a grid. First one wins.

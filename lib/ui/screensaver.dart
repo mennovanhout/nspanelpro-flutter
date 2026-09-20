@@ -68,11 +68,7 @@ class _ScreensaverState extends State<Screensaver> {
   void initState() {
     super.initState();
     _armClock();
-    _move();
-    _moveTimer = Timer.periodic(
-      Duration(seconds: max(10, widget.config.moveSeconds)),
-      (_) => _move(),
-    );
+    _placeClock();
     if (widget.config.imageUrl != null) {
       _nextImage();
       _imageTimer = Timer.periodic(
@@ -97,6 +93,33 @@ class _ScreensaverState extends State<Screensaver> {
       if (!mounted) return;
       setState(_armClock);
     });
+  }
+
+  /// A fixed clock sits where it was told; a wandering one starts somewhere
+  /// random and moves every move_every seconds so nothing burns in.
+  void _placeClock() {
+    _moveTimer?.cancel();
+    _moveTimer = null;
+    final fixed = ScreensaverConfig.clockSpots[widget.config.clockPosition];
+    if (fixed != null) {
+      _spot = fixed;
+      return;
+    }
+    _move();
+    _moveTimer = Timer.periodic(
+      Duration(seconds: max(10, widget.config.moveSeconds)),
+      (_) => _move(),
+    );
+  }
+
+  @override
+  void didUpdateWidget(Screensaver old) {
+    super.didUpdateWidget(old);
+    // the dashboard was edited while the panel slept
+    if (old.config.clockPosition != widget.config.clockPosition ||
+        old.config.moveSeconds != widget.config.moveSeconds) {
+      setState(_placeClock);
+    }
   }
 
   void _move() {
@@ -208,9 +231,11 @@ class _ScreensaverState extends State<Screensaver> {
               curve: Curves.easeInOutCubic,
               child: _FrostedClock(
                 time: '$hh:$mm',
-                date:
-                    '${_days[_now.weekday - 1]} ${_now.day} ${_months[_now.month - 1]}',
+                date: cfg.clockDate
+                    ? '${_days[_now.weekday - 1]} ${_now.day} ${_months[_now.month - 1]}'
+                    : null,
                 frost: cfg.frost,
+                size: cfg.clockSize,
               ),
             ),
         ],
@@ -224,17 +249,25 @@ class _FrostedClock extends StatelessWidget {
     required this.time,
     required this.date,
     required this.frost,
+    required this.size,
   });
-  final String time, date;
+  final String time;
+  final String? date;
   final bool frost;
+
+  /// The digits' height; everything else is a proportion of it, so the
+  /// 64 px default and a 120 px clock look like the same thing at two sizes.
+  final double size;
 
   @override
   Widget build(BuildContext context) {
+    final k = size / 64;
+    final radius = 24 * k;
     final panel = Container(
-      padding: const EdgeInsets.fromLTRB(22, 14, 22, 16),
+      padding: EdgeInsets.fromLTRB(22 * k, 14 * k, 22 * k, 16 * k),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: frost ? .14 : .0),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(radius),
         border: frost
             ? Border.all(color: Colors.white.withValues(alpha: .22))
             : null,
@@ -245,14 +278,14 @@ class _FrostedClock extends StatelessWidget {
         children: [
           Text(
             time,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
-              fontSize: 64,
+              fontSize: size,
               fontWeight: FontWeight.w700,
-              letterSpacing: -2.5,
+              letterSpacing: -2.5 * k,
               height: 1,
               fontFeatures: Ns.tabular,
-              shadows: [
+              shadows: const [
                 Shadow(
                   offset: Offset(0, 1),
                   blurRadius: 6,
@@ -261,28 +294,29 @@ class _FrostedClock extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 6),
-          Text(
-            date,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: .85),
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              shadows: const [
-                Shadow(
-                  offset: Offset(0, 1),
-                  blurRadius: 4,
-                  color: Color(0x80000000),
-                ),
-              ],
+          if (date != null) SizedBox(height: 6 * k),
+          if (date != null)
+            Text(
+              date!,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: .85),
+                fontSize: 16 * k,
+                fontWeight: FontWeight.w600,
+                shadows: const [
+                  Shadow(
+                    offset: Offset(0, 1),
+                    blurRadius: 4,
+                    color: Color(0x80000000),
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
     if (!frost) return panel;
     return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(radius),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
         child: panel,
