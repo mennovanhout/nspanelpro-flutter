@@ -109,7 +109,9 @@ the firmware wakes on touch; walk up instead. `sleep_after` keeps the photo up f
 seconds first, so a panel can be a picture frame in the evening and dark overnight. Under the
 hood the app puts the panel to sleep through its own adb daemon, the same path the updater
 uses, and holds a partial wake lock while dark so the sensor and the MQTT connection stay
-alive; if adb is not there the photo simply stays on and the log says why.
+alive; if adb is not there the photo simply stays on and the log says why. The backlight is
+part of what the proximity sensor reads, so the resting level is learned again once the
+screen is dark; otherwise its going off would count as somebody walking up.
 
 The clock wanders by default so that nothing sits on the same pixels all night. A fixed
 `clock_position` is the choice when the photo has a spot for it; the panel's LCD does not

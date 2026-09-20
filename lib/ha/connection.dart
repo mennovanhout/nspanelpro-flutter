@@ -39,6 +39,10 @@ class HaConnection {
   int _id = 1;
   final _pending = <int, Completer<dynamic>>{};
   final _subs = <int, void Function(dynamic)>{};
+
+  /// Counts successful connections. Subscriptions do not survive a socket,
+  /// so anything that subscribes once per connection compares against this.
+  int generation = 0;
   Duration _backoff = const Duration(seconds: 1);
   Timer? _retryTimer;
   bool _closed = false;
@@ -121,7 +125,9 @@ class HaConnection {
           c.complete(msg['result']);
         } else {
           final err = msg['error'];
-          c.completeError(StateError(err is Map ? '${err['message']}' : 'call failed'));
+          c.completeError(
+            StateError(err is Map ? '${err['message']}' : 'call failed'),
+          );
         }
       case 'event':
         _subs[msg['id']]?.call(msg['event']);
@@ -129,7 +135,9 @@ class HaConnection {
   }
 
   Future<dynamic> send(Map<String, dynamic> payload) {
-    if (!_authed || _t == null) return Future.error(StateError('not connected'));
+    if (!_authed || _t == null) {
+      return Future.error(StateError('not connected'));
+    }
     final id = _id++;
     final c = Completer<dynamic>();
     _pending[id] = c;
@@ -143,23 +151,29 @@ class HaConnection {
     Map<String, dynamic> payload,
     void Function(dynamic event) onEvent,
   ) {
-    if (!_authed || _t == null) return Future.error(StateError('not connected'));
+    if (!_authed || _t == null) {
+      return Future.error(StateError('not connected'));
+    }
     final id = _id++;
     _subs[id] = onEvent;
     final c = Completer<dynamic>();
     _pending[id] = c;
     _t!.send(jsonEncode({'id': id, ...payload}));
-    return c.future.then((_) => () async {
+    return c.future
+        .then(
+          (_) => () async {
+            _subs.remove(id);
+            try {
+              await send({'type': 'unsubscribe_events', 'subscription': id});
+            } catch (_) {
+              // already gone; nothing to release
+            }
+          },
+        )
+        .catchError((Object e) {
           _subs.remove(id);
-          try {
-            await send({'type': 'unsubscribe_events', 'subscription': id});
-          } catch (_) {
-            // already gone; nothing to release
-          }
-        }).catchError((Object e) {
-      _subs.remove(id);
-      throw e;
-    });
+          throw e;
+        });
   }
 
   /// get_states once, then every state_changed. Not subscribe_entities: its
@@ -172,14 +186,21 @@ class HaConnection {
         for (final s in list.cast<Map>())
           s['entity_id'] as String: HaState.fromJson(s.cast<String, dynamic>()),
       });
-      await subscribe({'type': 'subscribe_events', 'event_type': 'state_changed'}, (ev) {
-        final d = (ev as Map?)?['data'];
-        if (d is! Map) return;
-        final id = d['entity_id'];
-        if (id is! String) return;
-        final ns = d['new_state'];
-        states.update(id, ns is Map ? HaState.fromJson(ns.cast<String, dynamic>()) : null);
-      });
+      await subscribe(
+        {'type': 'subscribe_events', 'event_type': 'state_changed'},
+        (ev) {
+          final d = (ev as Map?)?['data'];
+          if (d is! Map) return;
+          final id = d['entity_id'];
+          if (id is! String) return;
+          final ns = d['new_state'];
+          states.update(
+            id,
+            ns is Map ? HaState.fromJson(ns.cast<String, dynamic>()) : null,
+          );
+        },
+      );
+      generation++;
       onReady?.call();
     } catch (e) {
       debugPrint('seed failed: $e');
@@ -189,7 +210,11 @@ class HaConnection {
   /// False when HA refused it (a wrong alarm code, say) or the socket is
   /// down; the reason goes to the log. Most cards fire and forget; the alarm
   /// card's keypad needs the answer.
-  Future<bool> callService(String domain, String service, [Map<String, dynamic>? data]) async {
+  Future<bool> callService(
+    String domain,
+    String service, [
+    Map<String, dynamic>? data,
+  ]) async {
     try {
       await send({
         'type': 'call_service',

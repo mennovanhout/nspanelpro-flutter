@@ -11,7 +11,9 @@ import 'package:nspanel_app/ha/transport.dart';
 /// house and echo back a state_changed, so the round trip is real.
 class FakeHa implements HaTransport {
   FakeHa(this.states, {this.acceptToken = 'good'}) {
-    scheduleMicrotask(() => _emit({'type': 'auth_required', 'ha_version': 'test'}));
+    scheduleMicrotask(
+      () => _emit({'type': 'auth_required', 'ha_version': 'test'}),
+    );
   }
 
   final Map<String, Map<String, dynamic>> states;
@@ -33,50 +35,96 @@ class FakeHa implements HaTransport {
     sent.add(msg);
     switch (msg['type']) {
       case 'auth':
-        _emit(msg['access_token'] == acceptToken
-            ? {'type': 'auth_ok', 'ha_version': 'test'}
-            : {'type': 'auth_invalid', 'message': 'invalid access token'});
+        _emit(
+          msg['access_token'] == acceptToken
+              ? {'type': 'auth_ok', 'ha_version': 'test'}
+              : {'type': 'auth_invalid', 'message': 'invalid access token'},
+        );
       case 'get_states':
-        _emit({'id': msg['id'], 'type': 'result', 'success': true, 'result': states.values.toList()});
+        _emit({
+          'id': msg['id'],
+          'type': 'result',
+          'success': true,
+          'result': states.values.toList(),
+        });
       case 'subscribe_events':
         _subs[msg['id'] as int] = msg['event_type'] as String;
-        _emit({'id': msg['id'], 'type': 'result', 'success': true, 'result': null});
+        _emit({
+          'id': msg['id'],
+          'type': 'result',
+          'success': true,
+          'result': null,
+        });
       case 'unsubscribe_events':
         _subs.remove(msg['subscription']);
-        _emit({'id': msg['id'], 'type': 'result', 'success': true, 'result': null});
+        _emit({
+          'id': msg['id'],
+          'type': 'result',
+          'success': true,
+          'result': null,
+        });
       case 'call_service':
-        calls.add('${msg['domain']}.${msg['service']} ${jsonEncode(msg['service_data'])}');
-        final data = (msg['service_data'] as Map?)?.cast<String, dynamic>() ?? const {};
+        calls.add(
+          '${msg['domain']}.${msg['service']} ${jsonEncode(msg['service_data'])}',
+        );
+        final data =
+            (msg['service_data'] as Map?)?.cast<String, dynamic>() ?? const {};
         final id = data['entity_id'] as String?;
         // an alarm panel that only takes 1234, so a refused call is testable
-        if (msg['domain'] == 'alarm_control_panel' && data['code'] != null && data['code'] != '1234') {
+        if (msg['domain'] == 'alarm_control_panel' &&
+            data['code'] != null &&
+            data['code'] != '1234') {
           _emit({
-            'id': msg['id'], 'type': 'result', 'success': false,
-            'error': {'code': 'invalid_code', 'message': 'Invalid alarm code provided'},
+            'id': msg['id'],
+            'type': 'result',
+            'success': false,
+            'error': {
+              'code': 'invalid_code',
+              'message': 'Invalid alarm code provided',
+            },
           });
           return;
         }
-        _emit({'id': msg['id'], 'type': 'result', 'success': true, 'result': null});
+        _emit({
+          'id': msg['id'],
+          'type': 'result',
+          'success': true,
+          'result': null,
+        });
         if (id != null && states[id] != null && msg['domain'] == 'light') {
           final s = states[id]!;
-          if (msg['service'] == 'toggle') s['state'] = s['state'] == 'on' ? 'off' : 'on';
+          if (msg['service'] == 'toggle') {
+            s['state'] = s['state'] == 'on' ? 'off' : 'on';
+          }
           if (msg['service'] == 'turn_on') {
             s['state'] = 'on';
             if (data['brightness_pct'] is num) {
-              (s['attributes'] as Map)['brightness'] = ((data['brightness_pct'] as num) * 2.55).round();
+              (s['attributes'] as Map)['brightness'] =
+                  ((data['brightness_pct'] as num) * 2.55).round();
             }
           }
           push(id);
         }
         // switches and the like: turn_on / turn_off / toggle from any domain, a beat later
-        if (id != null && states[id] != null && const ['homeassistant', 'switch', 'input_boolean', 'fan'].contains(msg['domain'])) {
+        if (id != null &&
+            states[id] != null &&
+            const [
+              'homeassistant',
+              'switch',
+              'input_boolean',
+              'fan',
+            ].contains(msg['domain'])) {
           final s = states[id]!;
           if (msg['service'] == 'turn_on') s['state'] = 'on';
           if (msg['service'] == 'turn_off') s['state'] = 'off';
-          if (msg['service'] == 'toggle') s['state'] = s['state'] == 'on' ? 'off' : 'on';
+          if (msg['service'] == 'toggle') {
+            s['state'] = s['state'] == 'on' ? 'off' : 'on';
+          }
           Timer(const Duration(milliseconds: 50), () => push(id));
         }
-        if (id != null && states[id] != null && msg['domain'] == 'alarm_control_panel') {
+        if (id != null &&
+            states[id] != null &&
+            msg['domain'] == 'alarm_control_panel') {
           final s = states[id]!;
           s['state'] = msg['service'] == 'alarm_disarm'
               ? 'disarmed'
@@ -104,7 +152,10 @@ class FakeHa implements HaTransport {
           'id': msg['id'],
           'type': 'result',
           'success': false,
-          'error': {'code': 'unknown_command', 'message': 'fake does not implement ${msg['type']}'},
+          'error': {
+            'code': 'unknown_command',
+            'message': 'fake does not implement ${msg['type']}',
+          },
         });
     }
   }
@@ -130,8 +181,11 @@ class FakeHa implements HaTransport {
   }
 }
 
-Map<String, dynamic> st(String id, String state, [Map<String, dynamic>? attrs]) =>
-    {'entity_id': id, 'state': state, 'attributes': attrs ?? {}};
+Map<String, dynamic> st(
+  String id,
+  String state, [
+  Map<String, dynamic>? attrs,
+]) => {'entity_id': id, 'state': state, 'attributes': attrs ?? {}};
 
 void main() {
   late FakeHa fake;
@@ -144,7 +198,11 @@ void main() {
       'sensor.t': st('sensor.t', '21.4', {'unit_of_measurement': '°C'}),
     });
     states = HaStates();
-    conn = HaConnection(transportFactory: () async => fake, token: 'good', states: states);
+    conn = HaConnection(
+      transportFactory: () async => fake,
+      token: 'good',
+      states: states,
+    );
   });
 
   tearDown(() => conn.dispose());
@@ -159,28 +217,41 @@ void main() {
     expect(states.get('light.a')?.isOn, isTrue);
     expect(states.get('sensor.t')?.numeric, 21.4);
     expect(fake.sent.first['type'], 'auth');
-    expect(fake.sent.where((m) => m['type'] == 'subscribe_events').single['event_type'], 'state_changed');
+    expect(
+      fake.sent
+          .where((m) => m['type'] == 'subscribe_events')
+          .single['event_type'],
+      'state_changed',
+    );
   });
 
-  test('a service call round-trips as a state_changed into the entity notifier', () async {
-    final ready = Completer<void>();
-    conn.onReady = ready.complete;
-    await conn.start();
-    await ready.future;
+  test(
+    'a service call round-trips as a state_changed into the entity notifier',
+    () async {
+      final ready = Completer<void>();
+      conn.onReady = ready.complete;
+      await conn.start();
+      await ready.future;
 
-    final seen = <String>[];
-    states.listen('light.a').addListener(() => seen.add(states.get('light.a')!.state));
+      final seen = <String>[];
+      states
+          .listen('light.a')
+          .addListener(() => seen.add(states.get('light.a')!.state));
 
-    await conn.callService('light', 'toggle', {'entity_id': 'light.a'});
-    await pumpEventQueue();
-    expect(fake.calls, ['light.toggle {"entity_id":"light.a"}']);
-    expect(seen, ['off']);
-    expect(states.get('light.a')?.isOn, isFalse);
+      await conn.callService('light', 'toggle', {'entity_id': 'light.a'});
+      await pumpEventQueue();
+      expect(fake.calls, ['light.toggle {"entity_id":"light.a"}']);
+      expect(seen, ['off']);
+      expect(states.get('light.a')?.isOn, isFalse);
 
-    await conn.callService('light', 'turn_on', {'entity_id': 'light.a', 'brightness_pct': 40});
-    await pumpEventQueue();
-    expect(states.get('light.a')?.numAttr('brightness'), 102);
-  });
+      await conn.callService('light', 'turn_on', {
+        'entity_id': 'light.a',
+        'brightness_pct': 40,
+      });
+      await pumpEventQueue();
+      expect(states.get('light.a')?.numAttr('brightness'), 102);
+    },
+  );
 
   test('an untouched entity never notifies', () async {
     final ready = Completer<void>();
@@ -207,13 +278,51 @@ void main() {
     expect(req['url_path'], isNull);
   });
 
+  test(
+    'each connection is a new generation, and onReady runs on every one',
+    () async {
+      var fake = FakeHa({'light.a': st('light.a', 'on', {})});
+      final states = HaStates();
+      var readies = 0;
+      final conn = HaConnection(
+        transportFactory: () async => fake,
+        token: 'good',
+        states: states,
+      );
+      conn.onReady = () => readies++;
+      await conn.start();
+      await pumpEventQueue();
+      expect(conn.generation, 1);
+      expect(readies, 1);
+      // HA goes away and comes back: a fresh transport, a fresh generation
+      final old = fake;
+      fake = FakeHa({'light.a': st('light.a', 'on', {})});
+      await old.close();
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      await pumpEventQueue();
+      expect(conn.generation, 2);
+      expect(readies, 2);
+      expect(
+        fake.sent
+            .where((m) => m['type'] == 'subscribe_events')
+            .single['event_type'],
+        'state_changed',
+        reason: 'the new socket has to be subscribed again',
+      );
+      unawaited(conn.dispose());
+    },
+  );
+
   test('a subscription can be released', () async {
     final ready = Completer<void>();
     conn.onReady = ready.complete;
     await conn.start();
     await ready.future;
 
-    final unsub = await conn.subscribe({'type': 'subscribe_events', 'event_type': 'lovelace_updated'}, (_) {});
+    final unsub = await conn.subscribe({
+      'type': 'subscribe_events',
+      'event_type': 'lovelace_updated',
+    }, (_) {});
     await unsub();
     expect(fake.sent.any((m) => m['type'] == 'unsubscribe_events'), isTrue);
   });

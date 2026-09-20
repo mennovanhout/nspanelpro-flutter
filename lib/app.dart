@@ -30,18 +30,18 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.3.7';
+const appVersion = '0.3.8';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'NSPanel',
-        debugShowCheckedModeBanner: false,
-        theme: Ns.theme(),
-        home: const Shell(),
-      );
+    title: 'NSPanel',
+    debugShowCheckedModeBanner: false,
+    theme: Ns.theme(),
+    home: const Shell(),
+  );
 }
 
 /// Setup screen until there is a token; the dashboard after.
@@ -66,15 +66,26 @@ class _ShellState extends State<Shell> {
     // `--ez setup true` launch extra opens the setup screen, for adb.
     Settings.consumeSetupFile()
         .then((_) => Settings.load())
-        .then((s) async => (s, await Device.wantsSetup(), await getExternalStorageDirectory()))
-        .then((r) => setState(() {
-              _settings = r.$1;
-              _showSetup = r.$2;
-              _loaded = true;
-              // the app's own files dir: where setup.json goes, and where the
-              // update APK lands (the panel's shell user can read it there)
-              _updater = Updater(installed: appVersion, dir: r.$3 ?? Directory.systemTemp);
-            }));
+        .then(
+          (s) async => (
+            s,
+            await Device.wantsSetup(),
+            await getExternalStorageDirectory(),
+          ),
+        )
+        .then(
+          (r) => setState(() {
+            _settings = r.$1;
+            _showSetup = r.$2;
+            _loaded = true;
+            // the app's own files dir: where setup.json goes, and where the
+            // update APK lands (the panel's shell user can read it there)
+            _updater = Updater(
+              installed: appVersion,
+              dir: r.$3 ?? Directory.systemTemp,
+            );
+          }),
+        );
   }
 
   @override
@@ -96,7 +107,9 @@ class _ShellState extends State<Shell> {
       );
     } else {
       child = Dashboard(
-        key: ValueKey('dash|${_settings!.url}|${_settings!.token.hashCode}|${_settings!.dashboard}'),
+        key: ValueKey(
+          'dash|${_settings!.url}|${_settings!.token.hashCode}|${_settings!.dashboard}',
+        ),
         settings: _settings!,
         updater: _updater!,
         onReconfigure: (msg) => setState(() {
@@ -106,12 +119,20 @@ class _ShellState extends State<Shell> {
       );
     }
     // setup <-> dashboard, and the blank first frame -> whichever comes: a crossfade
-    return AnimatedSwitcher(duration: const Duration(milliseconds: 450), child: child);
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 450),
+      child: child,
+    );
   }
 }
 
 class Dashboard extends StatefulWidget {
-  const Dashboard({super.key, required this.settings, required this.updater, required this.onReconfigure});
+  const Dashboard({
+    super.key,
+    required this.settings,
+    required this.updater,
+    required this.onReconfigure,
+  });
   final Settings settings;
   final Updater updater;
   final ValueChanged<String?> onReconfigure;
@@ -131,6 +152,7 @@ class _DashboardState extends State<Dashboard> {
   List<PanelPage> _pages = const [];
   String? _error;
   Future<void> Function()? _unsubLovelace;
+  int _lovelaceGen = -1;
 
   // screensaver: the dashboard card wins, then setup.json, then none
   ScreensaverConfig? _saverFromDashboard;
@@ -156,14 +178,21 @@ class _DashboardState extends State<Dashboard> {
     _frames.start();
     Device.hasVibrator().then((v) {
       _hasVibrator = v;
-      debugPrint('touch: vibrator ${v ? 'present' : 'absent'}, sound ${widget.settings.touchSound ? 'on' : 'off'}');
+      debugPrint(
+        'touch: vibrator ${v ? 'present' : 'absent'}, sound ${widget.settings.touchSound ? 'on' : 'off'}',
+      );
     });
     _conn = HaConnection(
       transportFactory: () => WebSocketTransport.connect(widget.settings.wsUri),
       token: widget.settings.token,
       states: _states,
     );
-    _env = PanelEnv(states: _states, conn: _conn, settings: widget.settings, play: (ref) => _announcer.play(ref));
+    _env = PanelEnv(
+      states: _states,
+      conn: _conn,
+      settings: widget.settings,
+      play: (ref) => _announcer.play(ref),
+    );
 
     // Draw the last known dashboard immediately; HA's answer replaces it.
     final cached = widget.settings.cachedConfig;
@@ -184,10 +213,12 @@ class _DashboardState extends State<Dashboard> {
     _armIdle();
     _announcer = Announcer(settings: widget.settings, conn: _conn);
     // host and user only - the password never goes anywhere near a log
-    debugPrint(widget.settings.hasMqtt
-        ? 'mqtt: configured for ${widget.settings.mqttHost}:${widget.settings.mqttPort} '
-            'as ${widget.settings.mqttUser ?? '(no user)'}'
-        : 'mqtt: not configured (no mqtt block in settings)');
+    debugPrint(
+      widget.settings.hasMqtt
+          ? 'mqtt: configured for ${widget.settings.mqttHost}:${widget.settings.mqttPort} '
+                'as ${widget.settings.mqttUser ?? '(no user)'}'
+          : 'mqtt: not configured (no mqtt block in settings)',
+    );
     if (widget.settings.hasMqtt) _startBridge();
   }
 
@@ -207,7 +238,8 @@ class _DashboardState extends State<Dashboard> {
     if (!mounted) return;
     final base = 'nspanel/$id';
     _mqtt = MqttClient(
-      transportFactory: () => SocketMqttTransport.connect(s.mqttHost, s.mqttPort),
+      transportFactory: () =>
+          SocketMqttTransport.connect(s.mqttHost, s.mqttPort),
       clientId: 'nspanel-$id',
       username: s.mqttUser,
       password: s.mqttPass,
@@ -237,16 +269,25 @@ class _DashboardState extends State<Dashboard> {
     _bridge = b;
     // the update entity follows the updater; the first check is half a
     // minute after start so it never competes with the dashboard loading
-    for (final n in [widget.updater.latest, widget.updater.progress, widget.updater.status]) {
+    for (final n in [
+      widget.updater.latest,
+      widget.updater.progress,
+      widget.updater.status,
+    ]) {
       n.addListener(_publishUpdate);
     }
     _updateCheck?.cancel();
     _updateCheck = Timer(const Duration(seconds: 30), () {
       widget.updater.check();
-      _updateCheck = Timer.periodic(const Duration(hours: 6), (_) => widget.updater.check());
+      _updateCheck = Timer.periodic(
+        const Duration(hours: 6),
+        (_) => widget.updater.check(),
+      );
     });
     _mqtt!.connected.addListener(() {
-      debugPrint('mqtt: ${_mqtt!.connected.value ? 'connected, device announced' : 'disconnected'}');
+      debugPrint(
+        'mqtt: ${_mqtt!.connected.value ? 'connected, device announced' : 'disconnected'}',
+      );
     });
     b.start();
 
@@ -256,7 +297,10 @@ class _DashboardState extends State<Dashboard> {
     b.screensaver(_saving);
     b.page(0);
     _publishDiagnostics();
-    _diag = Timer.periodic(const Duration(seconds: 60), (_) => _publishDiagnostics());
+    _diag = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => _publishDiagnostics(),
+    );
   }
 
   /// A second after the pages appear - the cards have risen into place by
@@ -271,15 +315,15 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Widget _page(PanelPage p, {required bool animate}) => Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (var i = 0; i < p.cards.length; i++) ...[
-            if (i > 0) const SizedBox(height: Ns.gap),
-            // cards rise into place, staggered, when a page first shows
-            Enter(index: i, animate: animate, child: buildCard(p.cards[i], _env)),
-          ],
-        ],
-      );
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      for (var i = 0; i < p.cards.length; i++) ...[
+        if (i > 0) const SizedBox(height: Ns.gap),
+        // cards rise into place, staggered, when a page first shows
+        Enter(index: i, animate: animate, child: buildCard(p.cards[i], _env)),
+      ],
+    ],
+  );
 
   void _publishUpdate() {
     final u = widget.updater;
@@ -316,7 +360,11 @@ class _DashboardState extends State<Dashboard> {
     _diag?.cancel();
     _warmTimer?.cancel();
     _updateCheck?.cancel();
-    for (final n in [widget.updater.latest, widget.updater.progress, widget.updater.status]) {
+    for (final n in [
+      widget.updater.latest,
+      widget.updater.progress,
+      widget.updater.status,
+    ]) {
       n.removeListener(_publishUpdate);
     }
     _proxAlways?.cancel();
@@ -355,15 +403,20 @@ class _DashboardState extends State<Dashboard> {
         if (!_saving) _armIdle();
         _error = pages.isEmpty
             ? 'The dashboard "${path.isEmpty ? 'default' : path}" has no cards this app can '
-                'draw. It needs custom:nspanel-* cards.'
+                  'draw. It needs custom:nspanel-* cards.'
             : null;
       });
       await widget.settings.cacheConfig(jsonEncode(cfg));
-      // Edit the dashboard in HA and the panel follows.
-      _unsubLovelace ??= await _conn.subscribe(
-        {'type': 'subscribe_events', 'event_type': 'lovelace_updated'},
-        (_) => _loadConfig(),
-      );
+      // Edit the dashboard in HA and the panel follows. Subscriptions die
+      // with the socket, so this is per connection, not once: a panel that
+      // had lost HA for a minute used to stop following edits for good.
+      if (_lovelaceGen != _conn.generation) {
+        _lovelaceGen = _conn.generation;
+        _unsubLovelace = await _conn.subscribe({
+          'type': 'subscribe_events',
+          'event_type': 'lovelace_updated',
+        }, (_) => _loadConfig());
+      }
     } catch (e) {
       final msg = await _explain(path, e);
       if (!mounted) return;
@@ -379,11 +432,17 @@ class _DashboardState extends State<Dashboard> {
     List<Map<String, dynamic>> list = const [];
     try {
       final r = await _conn.send({'type': 'lovelace/dashboards/list'});
-      list = (r as List).whereType<Map>().map((m) => m.cast<String, dynamic>()).toList();
+      list = (r as List)
+          .whereType<Map>()
+          .map((m) => m.cast<String, dynamic>())
+          .toList();
     } catch (_) {
       return 'Could not load $name: $e';
     }
-    final paths = list.map((d) => d['url_path']?.toString()).whereType<String>().toList();
+    final paths = list
+        .map((d) => d['url_path']?.toString())
+        .whereType<String>()
+        .toList();
     if (path.isNotEmpty && paths.contains(path)) {
       return 'Dashboard "$path" exists but has no saved config yet - it is still the '
           'auto-generated one. In Home Assistant open it, then ⋮ → Edit dashboard → '
@@ -499,6 +558,14 @@ class _DashboardState extends State<Dashboard> {
     }
     _dark = ok;
     debugPrint(ok ? 'display: off' : 'display: stays on (see above)');
+    // The backlight is part of what the sensor reads: the resting level
+    // shifts when it goes off (351 dark against 405 lit on one wall here),
+    // and a baseline learned while it was still on reads that shift as an
+    // approach and wakes the panel straight back up. So learn it again now.
+    if (ok) {
+      _prox?.cancel();
+      _watchProximity();
+    }
   }
 
   void _wake([String why = 'touch or HA']) {
@@ -528,15 +595,20 @@ class _DashboardState extends State<Dashboard> {
       above: s.proximityAbove,
     );
     var logged = false;
-    _prox = Proximity.stream.listen((v) {
-      if (detector.feed(v)) _wake('approach: reading $v, resting ${detector.resting}');
-      if (!logged && detector.resting != null) {
-        logged = true;
-        debugPrint('proximity: resting at ${detector.resting}');
-      }
-    }, onError: (_) {
-      // no sensor on this device; touch still wakes it
-    });
+    _prox = Proximity.stream.listen(
+      (v) {
+        if (detector.feed(v)) {
+          _wake('approach: reading $v, resting ${detector.resting}');
+        }
+        if (!logged && detector.resting != null) {
+          logged = true;
+          debugPrint('proximity: resting at ${detector.resting}');
+        }
+      },
+      onError: (_) {
+        // no sensor on this device; touch still wakes it
+      },
+    );
   }
 
   @override
@@ -567,16 +639,23 @@ class _DashboardState extends State<Dashboard> {
                   _bridge?.page(i);
                 },
                 pages: [
-                  for (var i = 0; i < _pages.length; i++) _page(_pages[i], animate: i == _shown),
+                  for (var i = 0; i < _pages.length; i++)
+                    _page(_pages[i], animate: i == _shown),
                 ],
               )
             else
               Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text(_error ?? 'Connecting…',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: _error == null ? Ns.muted : Ns.danger, fontSize: 15, height: 1.4)),
+                  child: Text(
+                    _error ?? 'Connecting…',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _error == null ? Ns.muted : Ns.danger,
+                      fontSize: 15,
+                      height: 1.4,
+                    ),
+                  ),
                 ),
               ),
             if (_warm)
@@ -591,8 +670,14 @@ class _DashboardState extends State<Dashboard> {
                 bottom: 30,
                 child: Container(
                   padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: Ns.surface, borderRadius: BorderRadius.circular(12)),
-                  child: Text(_error!, style: const TextStyle(color: Ns.danger, fontSize: 12)),
+                  decoration: BoxDecoration(
+                    color: Ns.surface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: Ns.danger, fontSize: 12),
+                  ),
                 ),
               ),
             if (_saverMounted && _saver != null)
