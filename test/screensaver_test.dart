@@ -24,6 +24,8 @@ void main() {
       expect(s.clockSize, 64);
       expect(s.clockDate, isTrue);
       expect(s.frost, isTrue);
+      expect(s.sleep, isFalse);
+      expect(s.sleepAfterSeconds, 0);
       expect(s.wakeOnProximity, isTrue);
       expect(s.proximityDelta, 12);
       expect(s.proximityBelow, isNull);
@@ -40,6 +42,8 @@ void main() {
       'clock_position': 'bottom-right',
       'clock_size': 96,
       'clock_date': false,
+      'sleep': true,
+      'sleep_after': 600,
       'wake_on_proximity': false,
       'proximity_below': 40,
     });
@@ -56,6 +60,9 @@ void main() {
     );
     expect(s.clockSize, 96);
     expect(s.clockDate, isFalse);
+    expect(s.sleep, isTrue);
+    expect(s.sleepAfterSeconds, 600);
+    expect(ScreensaverConfig.fromMap({'sleep_after': -5}).sleepAfterSeconds, 0);
     // an unknown spot wanders; the size is kept readable
     expect(
       ScreensaverConfig.fromMap({'clock_position': 'middle'}).clockWanders,

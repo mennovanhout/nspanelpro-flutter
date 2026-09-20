@@ -11,6 +11,7 @@ import 'cards/registry.dart';
 import 'mqtt/bridge.dart';
 import 'mqtt/client.dart';
 import 'util/device.dart';
+import 'util/display.dart';
 import 'util/frames.dart';
 import 'config/dashboard.dart';
 import 'config/screensaver.dart';
@@ -29,7 +30,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.3.6';
+const appVersion = '0.3.7';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});
@@ -134,6 +135,11 @@ class _DashboardState extends State<Dashboard> {
   // screensaver: the dashboard card wins, then setup.json, then none
   ScreensaverConfig? _saverFromDashboard;
   bool _saving = false;
+  // the screensaver's sleep option: the display goes dark sleep_after
+  // seconds in, and comes back on whatever wakes the screensaver
+  final _display = DisplayPower();
+  Timer? _darkTimer;
+  bool _dark = false;
   Timer? _idle;
   StreamSubscription<double>? _prox;
 
@@ -320,6 +326,7 @@ class _DashboardState extends State<Dashboard> {
     _pageJump.dispose();
     _idle?.cancel();
     _prox?.cancel();
+    _darkTimer?.cancel();
     _conn.status.removeListener(_onStatus);
     _unsubLovelace?.call();
     _conn.dispose();
@@ -475,11 +482,35 @@ class _DashboardState extends State<Dashboard> {
     debugPrint('screensaver: on (${force ? 'switched on from HA' : 'idle'})');
     _bridge?.screensaver(true);
     _watchProximity();
+    final s = _saver;
+    if (s != null && s.sleep) {
+      _darkTimer?.cancel();
+      _darkTimer = Timer(Duration(seconds: s.sleepAfterSeconds), _goDark);
+    }
+  }
+
+  Future<void> _goDark() async {
+    if (!_saving || _dark) return;
+    final ok = await _display.off();
+    if (!_saving) {
+      // woken while the key was in flight: undo it
+      if (ok) await _display.on();
+      return;
+    }
+    _dark = ok;
+    debugPrint(ok ? 'display: off' : 'display: stays on (see above)');
   }
 
   void _wake([String why = 'touch or HA']) {
     _prox?.cancel();
     _prox = null;
+    _darkTimer?.cancel();
+    _darkTimer = null;
+    if (_dark) {
+      _dark = false;
+      debugPrint('display: on');
+      _display.on();
+    }
     if (_saving) debugPrint('screensaver: off ($why)');
     if (mounted && _saving) setState(() => _saving = false);
     _forcedSaver = null;

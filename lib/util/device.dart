@@ -85,6 +85,35 @@ class Device {
     }
   }
 
+  /// Whether the display is on (Android's "interactive" state).
+  static Future<bool> isInteractive() async {
+    try {
+      return await _m.invokeMethod<bool>('isInteractive') ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// Turns a sleeping display back on, through a wake lock that is allowed
+  /// to cause the wake-up.
+  static Future<void> wakeScreen() async {
+    try {
+      await _m.invokeMethod<bool>('wakeScreen');
+    } catch (_) {
+      // not Android, or no power service
+    }
+  }
+
+  /// Keeps the SoC running while the display sleeps, so the proximity sensor
+  /// and the MQTT socket stay alive in the dark.
+  static Future<void> holdCpu(bool on) async {
+    try {
+      await _m.invokeMethod<bool>('holdCpu', on);
+    } catch (_) {
+      // nothing to hold
+    }
+  }
+
   static Future<int?> volume() async {
     try {
       return await _m.invokeMethod<int>('getVolume');

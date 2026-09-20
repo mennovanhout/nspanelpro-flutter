@@ -90,12 +90,26 @@ matching empty card, so Lovelace does not complain either); the app reads it and
   clock_date: true            # the day and date under the time; default true
   move_every: 60              # seconds between clock positions while it wanders; default 60
   frost: true                 # frosted panel behind the clock; default true
+  sleep: false                # turn the backlight fully off while the screensaver runs
+  sleep_after: 0              # ...this many seconds into it (0 = at once, the photo is
+                              # skipped; 600 = ten minutes of photo, then dark)
   wake_on_proximity: true     # default true
   proximity_delta: 12         # how far the reading must move from its resting level
 ```
 
 The same keys also go under `screensaver` in a pushed `setup.json`, which is the right place
 when different panels want different pictures; the dashboard card wins when both exist.
+
+**Sleep.** With `sleep: true` the screensaver turns the LCD backlight fully off - not the
+"Screen brightness" entity's 0, which on this panel is the driver's floor of 10/255 and still
+glows in a dark room - and turns it back on for anything that wakes the screensaver: someone
+walking up (the proximity sensor keeps reading in the dark), the **Screensaver** switch in Home
+Assistant, or the `wake` command to the panel. A touch may or may not, depending on whether
+the firmware wakes on touch; walk up instead. `sleep_after` keeps the photo up for that many
+seconds first, so a panel can be a picture frame in the evening and dark overnight. Under the
+hood the app puts the panel to sleep through its own adb daemon, the same path the updater
+uses, and holds a partial wake lock while dark so the sensor and the MQTT connection stay
+alive; if adb is not there the photo simply stays on and the log says why.
 
 The clock wanders by default so that nothing sits on the same pixels all night. A fixed
 `clock_position` is the choice when the photo has a spot for it; the panel's LCD does not

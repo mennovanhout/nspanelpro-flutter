@@ -19,6 +19,8 @@ class ScreensaverConfig {
     this.clockDate = true,
     this.moveSeconds = 60,
     this.frost = true,
+    this.sleep = false,
+    this.sleepAfterSeconds = 0,
     this.wakeOnProximity = true,
     this.proximityDelta = 12,
     this.proximityBelow,
@@ -59,6 +61,12 @@ class ScreensaverConfig {
   bool get clockWanders => !clockSpots.containsKey(clockPosition);
   final bool frost;
 
+  /// Turn the LCD backlight fully off [sleepAfterSeconds] into the
+  /// screensaver (0: as soon as it starts). Proximity and Home Assistant
+  /// still wake it; the photo is only shown until then.
+  final bool sleep;
+  final int sleepAfterSeconds;
+
   /// Wake when the proximity reading moves away from its resting level by
   /// more than [proximityDelta] - learned during the first seconds of the
   /// screensaver, so nobody has to know which way the sensor counts.
@@ -86,6 +94,8 @@ class ScreensaverConfig {
     clockDate: m['clock_date'] is bool ? m['clock_date'] as bool : true,
     moveSeconds: (m['move_every'] as num?)?.toInt() ?? 60,
     frost: m['frost'] is bool ? m['frost'] as bool : true,
+    sleep: m['sleep'] is bool ? m['sleep'] as bool : false,
+    sleepAfterSeconds: ((m['sleep_after'] as num?)?.toInt() ?? 0).clamp(0, 86400),
     wakeOnProximity: m['wake_on_proximity'] is bool
         ? m['wake_on_proximity'] as bool
         : true,

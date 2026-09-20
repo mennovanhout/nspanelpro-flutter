@@ -13,6 +13,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.net.wifi.WifiManager
 import android.os.Bundle
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
@@ -30,6 +31,10 @@ class MainActivity : FlutterActivity() {
     private var pool: SoundPool? = null
     private var tickId = 0
     private var tickReady = false
+
+    // Held while the screensaver has put the display to sleep, so the SoC
+    // keeps feeding the proximity sensor and the MQTT socket in the dark.
+    private var cpuLock: PowerManager.WakeLock? = null
 
     private fun loadTick() {
         if (pool != null) return
@@ -141,6 +146,37 @@ class MainActivity : FlutterActivity() {
                     if (tickReady) pool?.play(tickId, vol, vol, 1, 0, 1f)
                     result.success(tickReady)
                 }
+                "isInteractive" -> {
+                    val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                    result.success(pm.isInteractive)
+                }
+                // The one way an app turns a sleeping display back on without
+                // system permissions: a bright wake lock flagged to cause the
+                // wake-up. Deprecated since API 17, still what the framework
+                // honours on 27, and this panel is 27.
+                "wakeScreen" -> {
+                    val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                    @Suppress("DEPRECATION")
+                    val wl = pm.newWakeLock(
+                        PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP
+                            or PowerManager.ON_AFTER_RELEASE, "nspanel:wake")
+                    wl.acquire(3000)
+                    result.success(true)
+                }
+                "holdCpu" -> {
+                    val on = call.arguments as? Boolean ?: false
+                    val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                    if (on) {
+                        if (cpuLock == null) {
+                            cpuLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "nspanel:dark")
+                            cpuLock?.acquire()
+                        }
+                    } else {
+                        cpuLock?.let { if (it.isHeld) it.release() }
+                        cpuLock = null
+                    }
+                    result.success(true)
+                }
                 "getVolume" -> {
                     val max = audio.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
                     val cur = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
@@ -160,6 +196,8 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         pool?.release()
         pool = null
+        cpuLock?.let { if (it.isHeld) it.release() }
+        cpuLock = null
         val sensors = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         proximityListener?.let { sensors.unregisterListener(it) }
         lightListener?.let { sensors.unregisterListener(it) }

@@ -38,6 +38,11 @@ sounds, TTS through HA, self-update from GitHub Releases, start on boot.
   signed with the project keystore: `android/key.properties` (gitignored) on a dev machine,
   the `KEYSTORE_*` secrets on CI. A debug-signed build still installs, but the next release
   will not install over it. Changing the key means uninstall + reprovision on every panel.
+- **The screensaver's `sleep` is adb over localhost too.** `lib/util/display.dart` injects
+  the SLEEP key; the wake is a wake lock (`wakeScreen`) with the WAKEUP key as fallback.
+  Measured on the panel: sleep -> backlight power 0, proximity still flowing, app still in
+  focus on wake, no keyguard (`lockscreen.disabled=1`). Brightness 0 is NOT off: the driver
+  floors at 10/255.
 - **Self-update is adb over localhost.** The NSPanel Pro ships with `ro.adb.secure=0` and adbd
   on 127.0.0.1:5555; `lib/update/adb.dart` speaks just enough of the protocol to run
   `pm install -r` on the APK in the app's own files dir (which the shell user can read).
