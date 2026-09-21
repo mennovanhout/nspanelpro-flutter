@@ -95,7 +95,10 @@ class ScreensaverConfig {
     moveSeconds: (m['move_every'] as num?)?.toInt() ?? 60,
     frost: m['frost'] is bool ? m['frost'] as bool : true,
     sleep: m['sleep'] is bool ? m['sleep'] as bool : false,
-    sleepAfterSeconds: ((m['sleep_after'] as num?)?.toInt() ?? 0).clamp(0, 86400),
+    sleepAfterSeconds: ((m['sleep_after'] as num?)?.toInt() ?? 0).clamp(
+      0,
+      86400,
+    ),
     wakeOnProximity: m['wake_on_proximity'] is bool
         ? m['wake_on_proximity'] as bool
         : true,
@@ -103,6 +106,36 @@ class ScreensaverConfig {
     proximityBelow: (m['proximity_below'] as num?)?.toDouble(),
     proximityAbove: (m['proximity_above'] as num?)?.toDouble(),
   );
+
+  /// The same config with the panel's own settings from Home Assistant laid
+  /// over it: the keys a person changed on the panel's device page win over
+  /// the dashboard card, which stays the default for every panel.
+  ScreensaverConfig withOverrides(Map<String, dynamic>? o) {
+    if (o == null || o.isEmpty) return this;
+    return ScreensaverConfig(
+      afterSeconds:
+          (o['after'] as num?)?.toInt().clamp(10, 86400) ?? afterSeconds,
+      imageUrl: imageUrl,
+      imageRefreshSeconds: imageRefreshSeconds,
+      imageFit: imageFit,
+      clock: clock,
+      clockPosition: clockPosition,
+      clockSize: clockSize,
+      clockDate: clockDate,
+      moveSeconds: moveSeconds,
+      frost: frost,
+      sleep: o['sleep'] is bool ? o['sleep'] as bool : sleep,
+      sleepAfterSeconds:
+          (o['sleep_after'] as num?)?.toInt().clamp(0, 86400) ??
+          sleepAfterSeconds,
+      wakeOnProximity: wakeOnProximity,
+      proximityDelta:
+          (o['proximity_delta'] as num?)?.toDouble().clamp(1, 1000) ??
+          proximityDelta,
+      proximityBelow: proximityBelow,
+      proximityAbove: proximityAbove,
+    );
+  }
 
   /// The screensaver card, wherever it is in the dashboard - a view, a stack,
   /// a swipe card, a grid. First one wins.

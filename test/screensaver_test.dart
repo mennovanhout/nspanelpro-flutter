@@ -74,6 +74,27 @@ void main() {
     expect(s.proximityBelow, 40);
   });
 
+  test('overrides from HA win over the card, key by key, and are clamped', () {
+    final card = ScreensaverConfig.fromMap({
+      'after': 300,
+      'sleep': false,
+      'image_url': 'https://x/p',
+    });
+    final s = card.withOverrides({
+      'after': 60,
+      'sleep': true,
+      'proximity_delta': 30,
+    });
+    expect(s.afterSeconds, 60);
+    expect(s.sleep, isTrue);
+    expect(s.sleepAfterSeconds, 0, reason: 'not overridden: the card value');
+    expect(s.proximityDelta, 30);
+    expect(s.imageUrl, 'https://x/p', reason: 'everything else is the card');
+    expect(card.withOverrides(null), same(card));
+    expect(card.withOverrides({}), same(card));
+    expect(card.withOverrides({'after': 1}).afterSeconds, 10);
+  });
+
   test('is found wherever it sits in the dashboard', () {
     final cfg = {
       'views': [

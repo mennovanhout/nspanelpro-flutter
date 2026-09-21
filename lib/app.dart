@@ -10,6 +10,7 @@ import 'cards/env.dart';
 import 'cards/registry.dart';
 import 'mqtt/bridge.dart';
 import 'mqtt/client.dart';
+import 'util/auto_brightness.dart';
 import 'util/device.dart';
 import 'util/display.dart';
 import 'util/frames.dart';
@@ -30,7 +31,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.3.8';
+const appVersion = '0.4.0';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});
@@ -108,7 +109,8 @@ class _ShellState extends State<Shell> {
     } else {
       child = Dashboard(
         key: ValueKey(
-          'dash|${_settings!.url}|${_settings!.token.hashCode}|${_settings!.dashboard}',
+          'dash|${_settings!.url}|${_settings!.token.hashCode}|${_settings!.dashboard}'
+          '|${jsonEncode(_settings!.mqtt).hashCode}',
         ),
         settings: _settings!,
         updater: _updater!,
@@ -167,9 +169,12 @@ class _DashboardState extends State<Dashboard> {
 
   ScreensaverConfig? get _saver {
     if (_forcedSaver != null) return _forcedSaver;
-    if (_saverFromDashboard != null) return _saverFromDashboard;
-    final m = widget.settings.screensaver;
-    return m == null ? null : ScreensaverConfig.fromMap(m);
+    final base =
+        _saverFromDashboard ??
+        (widget.settings.screensaver == null
+            ? null
+            : ScreensaverConfig.fromMap(widget.settings.screensaver!));
+    return base?.withOverrides(widget.settings.overrides);
   }
 
   @override
@@ -253,6 +258,16 @@ class _DashboardState extends State<Dashboard> {
       version: appVersion,
       presenceDelta: _saver?.proximityDelta ?? 12,
       onBrightness: (v) async {
+        // a hand on the slider means "not automatic", like a phone
+        if (widget.settings.autoBrightness) {
+          widget.settings.brightness = {
+            ...?widget.settings.brightness,
+            'auto': false,
+          };
+          await widget.settings.save();
+          _follower.reset();
+          _publishSettings();
+        }
         if (await Device.setBrightness(v)) _bridge?.brightness(v);
       },
       onVolume: (v) async {
@@ -265,6 +280,7 @@ class _DashboardState extends State<Dashboard> {
       onStop: _announcer.stop,
       onWake: _wake,
       onInstall: () => widget.updater.install(),
+      onSetting: _onSetting,
     );
     _bridge = b;
     // the update entity follows the updater; the first check is half a
@@ -293,9 +309,13 @@ class _DashboardState extends State<Dashboard> {
 
     // sensors, continuously, rate-limited in the bridge
     _proxAlways = Proximity.stream.listen(b.proximity, onError: (_) {});
-    _lightSub = Device.light.listen(b.illuminance, onError: (_) {});
+    _lightSub = Device.light.listen((lux) {
+      b.illuminance(lux);
+      _followLight(lux);
+    }, onError: (_) {});
     b.screensaver(_saving);
     b.page(0);
+    _publishSettings();
     _publishDiagnostics();
     _diag = Timer.periodic(
       const Duration(seconds: 60),
@@ -337,6 +357,93 @@ class _DashboardState extends State<Dashboard> {
       percent: u.progress.value,
     );
     if (u.status.value.isNotEmpty) debugPrint('update: ${u.status.value}');
+  }
+
+  // ---- the panel's settings, from HA's device page -----------------------
+
+  final _follower = BrightnessFollower();
+
+  /// What HA should show for each setting: the effective value, which is the
+  /// dashboard card's unless it was overridden here.
+  void _publishSettings() {
+    final b = _bridge;
+    final s = _saver;
+    final st = widget.settings;
+    if (b == null) return;
+    if (s != null) {
+      b.setting('idle_timeout', s.afterSeconds.toString());
+      b.setting('sleep', s.sleep ? 'ON' : 'OFF');
+      b.setting('sleep_after', s.sleepAfterSeconds.toString());
+      b.setting('proximity_delta', s.proximityDelta.round().toString());
+    }
+    b.setting('auto_brightness', st.autoBrightness ? 'ON' : 'OFF');
+    b.setting('brightness_min', st.brightnessMin.toString());
+    b.setting('brightness_max', st.brightnessMax.toString());
+    b.setting('brightness_daylight', st.brightnessDaylight.round().toString());
+  }
+
+  Future<void> _onSetting(String object, String value) async {
+    final st = widget.settings;
+    final n = num.tryParse(value);
+    final on = value.toUpperCase() == 'ON';
+    switch (object) {
+      case 'settings_reset':
+        st.overrides = null;
+      case 'idle_timeout' when n != null:
+        st.overrides = {...?st.overrides, 'after': n.round()};
+      case 'sleep':
+        st.overrides = {...?st.overrides, 'sleep': on};
+      case 'sleep_after' when n != null:
+        st.overrides = {...?st.overrides, 'sleep_after': n.round()};
+      case 'proximity_delta' when n != null:
+        st.overrides = {...?st.overrides, 'proximity_delta': n.toDouble()};
+      case 'auto_brightness':
+        st.brightness = {...?st.brightness, 'auto': on};
+        _follower.reset();
+      case 'brightness_min' when n != null:
+        st.brightness = {...?st.brightness, 'min': n.round()};
+        _follower.reset();
+      case 'brightness_max' when n != null:
+        st.brightness = {...?st.brightness, 'max': n.round()};
+        _follower.reset();
+      case 'brightness_daylight' when n != null:
+        st.brightness = {...?st.brightness, 'daylight_lux': n.toDouble()};
+        _follower.reset();
+      default:
+        return;
+    }
+    await st.save();
+    debugPrint('settings: $object = $value');
+    _publishSettings();
+    // a new idle timeout counts from now; a sleep change applies to the
+    // screensaver that is running
+    if (!_saving) {
+      _armIdle();
+    } else if (_saver?.sleep == true && !_dark && _darkTimer == null) {
+      _darkTimer = Timer(Duration(seconds: _saver!.sleepAfterSeconds), _goDark);
+    } else if (_saver?.sleep == false) {
+      _darkTimer?.cancel();
+      _darkTimer = null;
+      if (_dark) {
+        _dark = false;
+        _display.on();
+      }
+    }
+  }
+
+  void _followLight(double lux) {
+    final st = widget.settings;
+    if (!st.autoBrightness || _dark) return;
+    final level = _follower.feed(
+      lux,
+      min: st.brightnessMin,
+      max: st.brightnessMax,
+      daylightLux: st.brightnessDaylight,
+    );
+    if (level == null) return;
+    Device.setBrightness(level).then((ok) {
+      if (ok) _bridge?.brightness(level);
+    });
   }
 
   Future<void> _publishDiagnostics() async {
@@ -577,6 +684,12 @@ class _DashboardState extends State<Dashboard> {
       _dark = false;
       debugPrint('display: on');
       _display.on();
+    } else {
+      // a process that started while the display was asleep (an update, a
+      // crash) has never been dark itself, but the screen still needs to come on
+      Device.isInteractive().then((on) {
+        if (!on) _display.on();
+      });
     }
     if (_saving) debugPrint('screensaver: off ($why)');
     if (mounted && _saving) setState(() => _saving = false);

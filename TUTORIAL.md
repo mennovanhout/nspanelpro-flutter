@@ -238,6 +238,10 @@ device with the name from step 5, and these entities:
   the panel to sleep or wake it from an automation
 - **Page** (which page is showing; set it to turn the page), **Screen brightness**, **Volume**
 - **App** — an update entity: the installed and latest version, and Install (step 9)
+- Under *Configuration*: **Idle timeout**, **Sleep**, **Sleep after**, **Wake sensitivity**,
+  **Auto brightness** with its minimum, maximum and daylight point, and **Use dashboard
+  settings**. Per-panel overrides of the screensaver card, and the screen following the
+  light sensor, all from HA rather than YAML or adb.
 - **Announce** — a notify entity: `notify.send_message` with text speaks it through your HA
   TTS engine; `sound:doorbell` (one of twenty built-in sounds - `alarm`, `laundry`, `armed`,
   `knock`, `timer`... the README lists them), a URL, a `/local/...` path or a

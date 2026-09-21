@@ -18,6 +18,8 @@ class Settings {
     this.name = 'NSPanel',
     this.ttsEngine = '',
     this.feedback,
+    this.overrides,
+    this.brightness,
   });
 
   String url;
@@ -39,14 +41,42 @@ class Settings {
   /// Touch feedback: {sound: true, vibrate: true, volume: 0.5}. Null = all on.
   Map<String, dynamic>? feedback;
 
-  bool get touchSound => feedback?['sound'] is bool ? feedback!['sound'] as bool : true;
-  bool get touchVibrate => feedback?['vibrate'] is bool ? feedback!['vibrate'] as bool : true;
-  double get touchVolume => ((feedback?['volume'] as num?)?.toDouble() ?? 0.5).clamp(0.0, 1.0);
+  /// Screensaver keys changed from Home Assistant's device page - `after`,
+  /// `sleep`, `sleep_after`, `proximity_delta` - which win over the dashboard
+  /// card. Null or empty: the dashboard card as it is.
+  Map<String, dynamic>? overrides;
+
+  /// Auto brightness: {auto, min, max, daylight_lux}. Also under `brightness`
+  /// in setup.json.
+  Map<String, dynamic>? brightness;
+
+  bool get autoBrightness =>
+      brightness?['auto'] is bool ? brightness!['auto'] as bool : false;
+  int get brightnessMin =>
+      ((brightness?['min'] as num?)?.toInt() ?? 20).clamp(0, 255);
+  int get brightnessMax =>
+      ((brightness?['max'] as num?)?.toInt() ?? 255).clamp(0, 255);
+  double get brightnessDaylight =>
+      ((brightness?['daylight_lux'] as num?)?.toDouble() ?? 500).clamp(
+        10,
+        100000,
+      );
+
+  bool get touchSound =>
+      feedback?['sound'] is bool ? feedback!['sound'] as bool : true;
+  bool get touchVibrate =>
+      feedback?['vibrate'] is bool ? feedback!['vibrate'] as bool : true;
+  double get touchVolume =>
+      ((feedback?['volume'] as num?)?.toDouble() ?? 0.5).clamp(0.0, 1.0);
 
   String get mqttHost => mqtt?['host']?.toString().trim() ?? '';
   int get mqttPort => (mqtt?['port'] as num?)?.toInt() ?? 1883;
-  String? get mqttUser => (mqtt?['username']?.toString().trim().isEmpty ?? true) ? null : mqtt!['username'].toString().trim();
-  String? get mqttPass => (mqtt?['password']?.toString().isEmpty ?? true) ? null : mqtt!['password'].toString();
+  String? get mqttUser => (mqtt?['username']?.toString().trim().isEmpty ?? true)
+      ? null
+      : mqtt!['username'].toString().trim();
+  String? get mqttPass => (mqtt?['password']?.toString().isEmpty ?? true)
+      ? null
+      : mqtt!['password'].toString();
   bool get hasMqtt => mqttHost.isNotEmpty;
 
   /// Lovelace url_path of the dashboard to render; empty = the default one.
@@ -65,6 +95,8 @@ class Settings {
   static const _kName = 'name';
   static const _kTts = 'tts_engine';
   static const _kFeedback = 'feedback';
+  static const _kOverrides = 'overrides';
+  static const _kBrightness = 'brightness';
 
   static Map<String, dynamic>? _map(SharedPreferences p, String key) {
     final raw = p.getString(key);
@@ -109,16 +141,29 @@ class Settings {
             : (current?.dashboard ?? ''),
         cachedConfig: current?.cachedConfig,
         screensaver: j.containsKey('screensaver')
-            ? (j['screensaver'] is Map ? (j['screensaver'] as Map).cast<String, dynamic>() : null)
+            ? (j['screensaver'] is Map
+                  ? (j['screensaver'] as Map).cast<String, dynamic>()
+                  : null)
             : current?.screensaver,
         mqtt: j.containsKey('mqtt')
-            ? (j['mqtt'] is Map ? (j['mqtt'] as Map).cast<String, dynamic>() : null)
+            ? (j['mqtt'] is Map
+                  ? (j['mqtt'] as Map).cast<String, dynamic>()
+                  : null)
             : current?.mqtt,
         name: j['name']?.toString().trim() ?? current?.name ?? 'NSPanel',
-        ttsEngine: j['tts_engine']?.toString().trim() ?? current?.ttsEngine ?? '',
+        ttsEngine:
+            j['tts_engine']?.toString().trim() ?? current?.ttsEngine ?? '',
         feedback: j.containsKey('feedback')
-            ? (j['feedback'] is Map ? (j['feedback'] as Map).cast<String, dynamic>() : null)
+            ? (j['feedback'] is Map
+                  ? (j['feedback'] as Map).cast<String, dynamic>()
+                  : null)
             : current?.feedback,
+        overrides: current?.overrides,
+        brightness: j.containsKey('brightness')
+            ? (j['brightness'] is Map
+                  ? (j['brightness'] as Map).cast<String, dynamic>()
+                  : null)
+            : current?.brightness,
       );
       await s.save();
       return true;
@@ -132,7 +177,9 @@ class Settings {
     final p = await SharedPreferences.getInstance();
     final url = p.getString(_kUrl);
     final token = p.getString(_kToken);
-    if (url == null || url.isEmpty || token == null || token.isEmpty) return null;
+    if (url == null || url.isEmpty || token == null || token.isEmpty) {
+      return null;
+    }
     return Settings(
       url: url,
       token: token,
@@ -143,6 +190,8 @@ class Settings {
       name: p.getString(_kName) ?? 'NSPanel',
       ttsEngine: p.getString(_kTts) ?? '',
       feedback: _map(p, _kFeedback),
+      overrides: _map(p, _kOverrides),
+      brightness: _map(p, _kBrightness),
     );
   }
 
@@ -153,7 +202,14 @@ class Settings {
     await p.setString(_kDash, dashboard);
     await p.setString(_kName, name);
     await p.setString(_kTts, ttsEngine);
-    for (final e in {_kSaver: screensaver, _kMqtt: mqtt, _kFeedback: feedback}.entries) {
+    final maps = {
+      _kSaver: screensaver,
+      _kMqtt: mqtt,
+      _kFeedback: feedback,
+      _kOverrides: overrides,
+      _kBrightness: brightness,
+    };
+    for (final e in maps.entries) {
       if (e.value == null) {
         await p.remove(e.key);
       } else {
@@ -178,6 +234,8 @@ class Settings {
     await p.remove(_kMqtt);
     await p.remove(_kName);
     await p.remove(_kTts);
+    await p.remove(_kOverrides);
+    await p.remove(_kBrightness);
   }
 
   /// The dashboard's url_path, however it was typed. People paste what the
@@ -206,7 +264,10 @@ class Settings {
 
   Uri get wsUri {
     final b = base;
-    return b.replace(scheme: b.scheme == 'https' ? 'wss' : 'ws', path: '/api/websocket');
+    return b.replace(
+      scheme: b.scheme == 'https' ? 'wss' : 'ws',
+      path: '/api/websocket',
+    );
   }
 
   /// entity_picture and friends are relative to HA. Plain concatenation, not

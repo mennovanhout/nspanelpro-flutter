@@ -100,6 +100,25 @@ matching empty card, so Lovelace does not complain either); the app reads it and
 The same keys also go under `screensaver` in a pushed `setup.json`, which is the right place
 when different panels want different pictures; the dashboard card wins when both exist.
 
+**Panel settings from Home Assistant.** The dashboard card is the config for every panel that
+shows that dashboard. When one panel wants something else - the hallway sleeps sooner, the
+bedroom never - open the panel's device page in Home Assistant: under *Configuration* it has
+**Idle timeout**, **Sleep**, **Sleep after** and **Wake sensitivity**. What you set there wins
+over the dashboard card for that one panel, is kept on the panel, and shows the effective
+value otherwise, so the entity always tells you what the panel is doing. **Use dashboard
+settings** drops the overrides. Nothing has to be typed on the wall and nothing goes through
+adb; the only thing the setup screen (two-finger hold) still needs is the MQTT broker itself,
+which has to exist before Home Assistant can see the device.
+
+**Auto brightness.** The same device page has **Auto brightness** with a minimum, a maximum
+and a daylight point: at 0 lx the screen sits at the minimum, at the daylight point (500 lx by
+default, a bright room) and above at the maximum, and in between the level follows the log
+of the reading, which is how eyes work. The reading is smoothed and the screen only moves in
+steps, so a cloud does not make it flicker; moving the **Screen brightness** slider by hand
+turns auto off, like a phone. A panel that never sees the sun wants a lower daylight point
+so it still reaches its maximum. The same keys go under `brightness` in `setup.json`:
+`{ "auto": true, "min": 20, "max": 255, "daylight_lux": 500 }`.
+
 **Sleep.** With `sleep: true` the screensaver turns the LCD backlight fully off - not the
 "Screen brightness" entity's 0, which on this panel is the driver's floor of 10/255 and still
 glows in a dark room - and turns it back on for anything that wakes the screensaver: someone
@@ -251,6 +270,9 @@ Give the app your MQTT broker and it registers itself through MQTT discovery: on
 | `number` Volume | speaker, 0–100 |
 | `notify` Announce | `notify.send_message`: text is spoken; a URL, an HA path, a media-browser file or a built-in sound is played |
 | `update` App | the installed and latest version, release notes, and Install (see Updating) |
+| `number` Idle timeout, `switch` Sleep, `number` Sleep after, `number` Wake sensitivity | the screensaver's `after`, `sleep`, `sleep_after` and `proximity_delta`, changeable from HA (see Panel settings) |
+| `switch` Auto brightness, `number` minimum / maximum / daylight | the screen follows the light sensor (see Panel settings) |
+| `button` Use dashboard settings | drops every override; the dashboard card is the config again |
 | `button` Stop audio | |
 | Wi-Fi signal, SoC temperature, slow frames, app version, last touch | diagnostics |
 

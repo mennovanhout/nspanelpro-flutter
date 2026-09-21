@@ -48,6 +48,11 @@ sounds, TTS through HA, self-update from GitHub Releases, start on boot.
   `pm install -r` on the APK in the app's own files dir (which the shell user can read).
   `BootReceiver` restarts the app on `MY_PACKAGE_REPLACED`. On a device that wants auth this
   fails clearly; it does not fall back to anything.
+- **Screensaver precedence is: HA override > dashboard card > setup.json.** The overrides
+  (`Settings.overrides`: after, sleep, sleep_after, proximity_delta) come from the config
+  entities on the device page and are applied in `_saver` through `withOverrides`; the
+  entities always show the effective value, and `settings_reset` clears them. Auto
+  brightness (`Settings.brightness`) is panel-only, never in the dashboard: it is hardware.
 - **Card options are the cards repo's.** When adding an option here, add it to the cards repo
   (default literal, README row, editor schema) or document it as native-only in both READMEs.
   Native-only today: `sounds` and `haptics` on the alarm card.

@@ -38,6 +38,7 @@ class PanelBridge {
     this.onStop,
     this.onWake,
     this.onInstall,
+    this.onSetting,
   });
 
   final MqttClient mqtt;
@@ -56,59 +57,105 @@ class PanelBridge {
   final VoidCallback? onWake;
   final VoidCallback? onInstall;
 
+  /// A panel setting changed from HA's device page: the object name and the
+  /// raw payload. `settings_reset` is the button.
+  final void Function(String object, String value)? onSetting;
+
+  /// The settings HA can change, as [object, discovery component, extra
+  /// config]. Every one is a `config` entity on the device page, so they sit
+  /// apart from the controls.
+  static const settingObjects = [
+    'idle_timeout',
+    'sleep',
+    'sleep_after',
+    'proximity_delta',
+    'auto_brightness',
+    'brightness_min',
+    'brightness_max',
+    'brightness_daylight',
+  ];
+
   String get base => 'nspanel/$deviceId';
   String get availabilityTopic => '$base/availability';
 
   Map<String, dynamic> get _device => {
-        'identifiers': ['nspanel_$deviceId'],
-        'name': name,
-        'manufacturer': 'Sonoff',
-        'model': 'NSPanel Pro 86',
-        'sw_version': version,
-      };
+    'identifiers': ['nspanel_$deviceId'],
+    'name': name,
+    'manufacturer': 'Sonoff',
+    'model': 'NSPanel Pro 86',
+    'sw_version': version,
+  };
 
   /// Every entity, as HA discovery wants it. Public so a test can read it.
   Map<String, Map<String, dynamic>> discoveryConfigs() {
-    Map<String, dynamic> e(String object, Map<String, dynamic> extra, {bool command = false}) => {
-          'name': extra.remove('name'),
-          'unique_id': 'nspanel_${deviceId}_$object',
-          'state_topic': '$base/$object',
-          if (command) 'command_topic': '$base/$object/set',
-          'availability_topic': availabilityTopic,
-          'device': _device,
-          ...extra,
-        };
+    Map<String, dynamic> e(
+      String object,
+      Map<String, dynamic> extra, {
+      bool command = false,
+    }) => {
+      'name': extra.remove('name'),
+      'unique_id': 'nspanel_${deviceId}_$object',
+      'state_topic': '$base/$object',
+      if (command) 'command_topic': '$base/$object/set',
+      'availability_topic': availabilityTopic,
+      'device': _device,
+      ...extra,
+    };
 
     final diag = {'entity_category': 'diagnostic'};
+    final conf = {'entity_category': 'config'};
     return {
       'sensor/$deviceId/proximity': e('proximity', {
-        'name': 'Proximity', 'state_class': 'measurement', 'icon': 'mdi:signal-distance-variant',
+        'name': 'Proximity',
+        'state_class': 'measurement',
+        'icon': 'mdi:signal-distance-variant',
       }),
       'binary_sensor/$deviceId/presence': e('presence', {
-        'name': 'Presence', 'device_class': 'occupancy',
+        'name': 'Presence',
+        'device_class': 'occupancy',
       }),
       'sensor/$deviceId/illuminance': e('illuminance', {
-        'name': 'Illuminance', 'device_class': 'illuminance', 'unit_of_measurement': 'lx',
+        'name': 'Illuminance',
+        'device_class': 'illuminance',
+        'unit_of_measurement': 'lx',
         'state_class': 'measurement',
       }),
       'binary_sensor/$deviceId/screensaver_active': e('screensaver', {
-        'name': 'Screensaver', 'icon': 'mdi:image-frame',
+        'name': 'Screensaver',
+        'icon': 'mdi:image-frame',
       }),
       'switch/$deviceId/screensaver': e('screensaver', {
-        'name': 'Screensaver', 'icon': 'mdi:image-frame',
+        'name': 'Screensaver',
+        'icon': 'mdi:image-frame',
       }, command: true),
       'sensor/$deviceId/last_touch': e('last_touch', {
-        'name': 'Last touch', 'device_class': 'timestamp', ...diag,
+        'name': 'Last touch',
+        'device_class': 'timestamp',
+        ...diag,
       }),
       'number/$deviceId/page': e('page', {
-        'name': 'Page', 'min': 0, 'max': 20, 'step': 1, 'mode': 'box', 'icon': 'mdi:view-carousel',
+        'name': 'Page',
+        'min': 0,
+        'max': 20,
+        'step': 1,
+        'mode': 'box',
+        'icon': 'mdi:view-carousel',
       }, command: true),
       'number/$deviceId/brightness': e('brightness', {
-        'name': 'Screen brightness', 'min': 0, 'max': 255, 'step': 1, 'mode': 'slider',
+        'name': 'Screen brightness',
+        'min': 0,
+        'max': 255,
+        'step': 1,
+        'mode': 'slider',
         'icon': 'mdi:brightness-6',
       }, command: true),
       'number/$deviceId/volume': e('volume', {
-        'name': 'Volume', 'min': 0, 'max': 100, 'step': 1, 'mode': 'slider', 'icon': 'mdi:volume-high',
+        'name': 'Volume',
+        'min': 0,
+        'max': 100,
+        'step': 1,
+        'mode': 'slider',
+        'icon': 'mdi:volume-high',
         'unit_of_measurement': '%',
       }, command: true),
       'notify/$deviceId/announce': {
@@ -128,23 +175,117 @@ class PanelBridge {
         'icon': 'mdi:stop',
       },
       'sensor/$deviceId/rssi': e('rssi', {
-        'name': 'Wi-Fi signal', 'device_class': 'signal_strength', 'unit_of_measurement': 'dBm',
-        'state_class': 'measurement', ...diag,
+        'name': 'Wi-Fi signal',
+        'device_class': 'signal_strength',
+        'unit_of_measurement': 'dBm',
+        'state_class': 'measurement',
+        ...diag,
       }),
       'sensor/$deviceId/soc_temperature': e('soc_temperature', {
-        'name': 'SoC temperature', 'device_class': 'temperature', 'unit_of_measurement': '°C',
-        'state_class': 'measurement', ...diag,
+        'name': 'SoC temperature',
+        'device_class': 'temperature',
+        'unit_of_measurement': '°C',
+        'state_class': 'measurement',
+        ...diag,
       }),
       // HA's update entity: "0.3.0 available", release notes, an Install
       // button. The app fetches the APK from GitHub and installs it itself.
       'update/$deviceId/app': e('update', {
-        'name': 'App', 'device_class': 'firmware', 'payload_install': 'install',
-        'icon': 'mdi:cellphone-arrow-down', 'entity_category': 'config',
+        'name': 'App',
+        'device_class': 'firmware',
+        'payload_install': 'install',
+        'icon': 'mdi:cellphone-arrow-down',
+        'entity_category': 'config',
       }, command: true),
       'sensor/$deviceId/slow_frames': e('slow_frames', {
-        'name': 'Slow frames', 'icon': 'mdi:speedometer-slow', 'state_class': 'total_increasing', ...diag,
+        'name': 'Slow frames',
+        'icon': 'mdi:speedometer-slow',
+        'state_class': 'total_increasing',
+        ...diag,
       }),
-      'sensor/$deviceId/version': e('version', {'name': 'App version', 'icon': 'mdi:tag', ...diag}),
+      'sensor/$deviceId/version': e('version', {
+        'name': 'App version',
+        'icon': 'mdi:tag',
+        ...diag,
+      }),
+      // the panel's own settings, changed from HA rather than on the wall or
+      // in YAML; the dashboard card stays the default, these win over it
+      'number/$deviceId/idle_timeout': e('idle_timeout', {
+        'name': 'Idle timeout',
+        'min': 10,
+        'max': 86400,
+        'step': 10,
+        'mode': 'box',
+        'unit_of_measurement': 's',
+        'icon': 'mdi:timer-sand',
+        ...conf,
+      }, command: true),
+      'switch/$deviceId/sleep': e('sleep', {
+        'name': 'Sleep (backlight off)',
+        'icon': 'mdi:power-sleep',
+        ...conf,
+      }, command: true),
+      'number/$deviceId/sleep_after': e('sleep_after', {
+        'name': 'Sleep after',
+        'min': 0,
+        'max': 86400,
+        'step': 10,
+        'mode': 'box',
+        'unit_of_measurement': 's',
+        'icon': 'mdi:weather-night',
+        ...conf,
+      }, command: true),
+      'number/$deviceId/proximity_delta': e('proximity_delta', {
+        'name': 'Wake sensitivity',
+        'min': 1,
+        'max': 1000,
+        'step': 1,
+        'mode': 'box',
+        'icon': 'mdi:motion-sensor',
+        ...conf,
+      }, command: true),
+      'switch/$deviceId/auto_brightness': e('auto_brightness', {
+        'name': 'Auto brightness',
+        'icon': 'mdi:brightness-auto',
+        ...conf,
+      }, command: true),
+      'number/$deviceId/brightness_min': e('brightness_min', {
+        'name': 'Auto brightness minimum',
+        'min': 0,
+        'max': 255,
+        'step': 1,
+        'mode': 'slider',
+        'icon': 'mdi:brightness-4',
+        ...conf,
+      }, command: true),
+      'number/$deviceId/brightness_max': e('brightness_max', {
+        'name': 'Auto brightness maximum',
+        'min': 0,
+        'max': 255,
+        'step': 1,
+        'mode': 'slider',
+        'icon': 'mdi:brightness-7',
+        ...conf,
+      }, command: true),
+      'number/$deviceId/brightness_daylight': e('brightness_daylight', {
+        'name': 'Auto brightness daylight',
+        'min': 10,
+        'max': 100000,
+        'step': 10,
+        'mode': 'box',
+        'unit_of_measurement': 'lx',
+        'icon': 'mdi:white-balance-sunny',
+        ...conf,
+      }, command: true),
+      'button/$deviceId/settings_reset': {
+        'name': 'Use dashboard settings',
+        'unique_id': 'nspanel_${deviceId}_settings_reset',
+        'command_topic': '$base/settings_reset/set',
+        'availability_topic': availabilityTopic,
+        'device': _device,
+        'icon': 'mdi:restore',
+        ...conf,
+      },
     };
   }
 
@@ -155,7 +296,10 @@ class PanelBridge {
 
   void _announce() {
     for (final entry in discoveryConfigs().entries) {
-      mqtt.publish('homeassistant/${entry.key}/config', jsonEncode(entry.value));
+      mqtt.publish(
+        'homeassistant/${entry.key}/config',
+        jsonEncode(entry.value),
+      );
     }
     mqtt.publish(availabilityTopic, 'online');
     mqtt.publish('$base/version', version);
@@ -163,11 +307,21 @@ class PanelBridge {
     mqtt.subscribe('$base/brightness/set', (_, v) => _int(v, onBrightness));
     mqtt.subscribe('$base/volume/set', (_, v) => _int(v, onVolume));
     mqtt.subscribe('$base/page/set', (_, v) => _int(v, onPage));
-    mqtt.subscribe('$base/screensaver/set', (_, v) => onScreensaver?.call(v.trim().toUpperCase() == 'ON'));
+    mqtt.subscribe(
+      '$base/screensaver/set',
+      (_, v) => onScreensaver?.call(v.trim().toUpperCase() == 'ON'),
+    );
     mqtt.subscribe('$base/stop/set', (_, _) => onStop?.call());
     mqtt.subscribe('$base/update/set', (_, v) {
       if (v.trim().toLowerCase() == 'install') onInstall?.call();
     });
+    for (final o in settingObjects) {
+      mqtt.subscribe('$base/$o/set', (_, v) => onSetting?.call(o, v.trim()));
+    }
+    mqtt.subscribe(
+      '$base/settings_reset/set',
+      (_, _) => onSetting?.call('settings_reset', 'PRESS'),
+    );
     // The notify entity sends the message text. Anything that names audio is
     // played - a URL, an HA path like /local/x.mp3, a media-source:// id from
     // HA's media browser, or a built-in `sound:doorbell` - and anything else
@@ -214,7 +368,12 @@ class PanelBridge {
   final _last = <String, String>{};
   final _lastAt = <String, DateTime>{};
 
-  void _set(String object, String value, {Duration minInterval = Duration.zero, bool force = false}) {
+  void _set(
+    String object,
+    String value, {
+    Duration minInterval = Duration.zero,
+    bool force = false,
+  }) {
     if (!force && _last[object] == value) return;
     final now = DateTime.now();
     final at = _lastAt[object];
@@ -249,13 +408,23 @@ class PanelBridge {
         _set('presence', present ? 'ON' : 'OFF');
       }
     }
-    _set('proximity', v.round().toString(), minInterval: const Duration(seconds: 1));
+    _set(
+      'proximity',
+      v.round().toString(),
+      minInterval: const Duration(seconds: 1),
+    );
   }
 
-  void illuminance(double lux) =>
-      _set('illuminance', lux.round().toString(), minInterval: const Duration(seconds: 2));
+  void illuminance(double lux) => _set(
+    'illuminance',
+    lux.round().toString(),
+    minInterval: const Duration(seconds: 2),
+  );
 
   void screensaver(bool on) => _set('screensaver', on ? 'ON' : 'OFF');
+
+  /// The current value of one of [settingObjects], as HA should show it.
+  void setting(String object, String value) => _set(object, value);
   void page(int i) => _set('page', i.toString());
   void brightness(int v) => _set('brightness', v.toString());
   void volume(int pct) => _set('volume', pct.toString());
@@ -271,20 +440,28 @@ class PanelBridge {
     String? notes,
     bool inProgress = false,
     int? percent,
-  }) =>
-      _set(
-          'update',
-          jsonEncode({
-            'installed_version': installed,
-            'latest_version': latest ?? installed,
-            'title': 'NSPanel app',
-            'release_url': ?url,
-            'release_summary': ?(notes == null || notes.isEmpty ? null : notes.length > 250 ? '${notes.substring(0, 250)}…' : notes),
-            'in_progress': inProgress,
-            'update_percentage': ?percent,
-          }),
-          force: true);
+  }) => _set(
+    'update',
+    jsonEncode({
+      'installed_version': installed,
+      'latest_version': latest ?? installed,
+      'title': 'NSPanel app',
+      'release_url': ?url,
+      'release_summary': ?(notes == null || notes.isEmpty
+          ? null
+          : notes.length > 250
+          ? '${notes.substring(0, 250)}…'
+          : notes),
+      'in_progress': inProgress,
+      'update_percentage': ?percent,
+    }),
+    force: true,
+  );
   void temperature(double c) => _set('soc_temperature', c.toStringAsFixed(1));
-  void touched() =>
-      _set('last_touch', DateTime.now().toUtc().toIso8601String(), minInterval: const Duration(seconds: 5), force: false);
+  void touched() => _set(
+    'last_touch',
+    DateTime.now().toUtc().toIso8601String(),
+    minInterval: const Duration(seconds: 5),
+    force: false,
+  );
 }
