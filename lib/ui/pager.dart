@@ -6,8 +6,19 @@ import 'theme.dart';
 /// cards' vertical one settle it in the gesture arena, which is the same
 /// axis-lock the web cards do by hand.
 class PanelPager extends StatefulWidget {
-  const PanelPager({super.key, required this.pages, this.jump, this.onPage});
+  const PanelPager({
+    super.key,
+    required this.pages,
+    this.jump,
+    this.onPage,
+    this.showDots = true,
+    this.initialPage = 0,
+  });
   final List<Widget> pages;
+
+  /// The page dots at the bottom; the swipe card's `dots: false` hides them.
+  final bool showDots;
+  final int initialPage;
 
   /// Set a page index here and the pager goes there - how HA turns the page.
   final ValueNotifier<int>? jump;
@@ -18,13 +29,21 @@ class PanelPager extends StatefulWidget {
 }
 
 class _PanelPagerState extends State<PanelPager> {
-  int _index = 0;
-  final _controller = PageController();
+  late int _index = widget.initialPage.clamp(
+    0,
+    widget.pages.isEmpty ? 0 : widget.pages.length - 1,
+  );
+  late final _controller = PageController(initialPage: _index);
 
   @override
   void initState() {
     super.initState();
     widget.jump?.addListener(_onJump);
+    if (_index != 0) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => widget.onPage?.call(_index),
+      );
+    }
   }
 
   @override
@@ -37,12 +56,16 @@ class _PanelPagerState extends State<PanelPager> {
   void _onJump() {
     final i = widget.jump!.value.clamp(0, widget.pages.length - 1);
     if (!_controller.hasClients || i == _index) return;
-    _controller.animateToPage(i, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+    _controller.animateToPage(
+      i,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final many = widget.pages.length > 1;
+    final many = widget.pages.length > 1 && widget.showDots;
     return Stack(
       children: [
         PageView.builder(
@@ -56,7 +79,12 @@ class _PanelPagerState extends State<PanelPager> {
             widget.onPage?.call(i);
           },
           itemBuilder: (_, i) => Padding(
-            padding: EdgeInsets.fromLTRB(Ns.gap, Ns.gap, Ns.gap, many ? 26 : Ns.gap),
+            padding: EdgeInsets.fromLTRB(
+              Ns.gap,
+              Ns.gap,
+              Ns.gap,
+              many ? 26 : Ns.gap,
+            ),
             child: widget.pages[i],
           ),
         ),
@@ -77,7 +105,9 @@ class _PanelPagerState extends State<PanelPager> {
                       height: i == _index ? 8 : 7,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: i == _index ? Ns.text : Colors.white.withValues(alpha: .22),
+                        color: i == _index
+                            ? Ns.text
+                            : Colors.white.withValues(alpha: .22),
                       ),
                     ),
                 ],

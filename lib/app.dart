@@ -31,7 +31,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.4.0';
+const appVersion = '0.5.0';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});
@@ -152,6 +152,7 @@ class _DashboardState extends State<Dashboard> {
   late final HaConnection _conn;
   late final PanelEnv _env;
   List<PanelPage> _pages = const [];
+  PagerOptions _pager = const PagerOptions();
   String? _error;
   Future<void> Function()? _unsubLovelace;
   int _lovelaceGen = -1;
@@ -205,6 +206,7 @@ class _DashboardState extends State<Dashboard> {
       try {
         final cfg = (jsonDecode(cached) as Map).cast<String, dynamic>();
         _pages = pagesFromLovelace(cfg);
+        _pager = pagerOptionsFromLovelace(cfg);
         _scheduleWarmup();
         _saverFromDashboard = ScreensaverConfig.findInLovelace(cfg);
       } catch (_) {
@@ -502,6 +504,7 @@ class _DashboardState extends State<Dashboard> {
       if (!mounted) return;
       setState(() {
         _pages = pages;
+        _pager = pagerOptionsFromLovelace(cfg);
         _scheduleWarmup();
         _saverFromDashboard = ScreensaverConfig.findInLovelace(cfg);
         // a fresh panel has no cached config, so this is the first moment
@@ -746,6 +749,9 @@ class _DashboardState extends State<Dashboard> {
           children: [
             if (_pages.isNotEmpty)
               PanelPager(
+                key: ValueKey('pager|${_pager.dots}|${_pager.start}'),
+                showDots: _pager.dots,
+                initialPage: _pager.start,
                 jump: _pageJump,
                 onPage: (i) {
                   _shown = i;

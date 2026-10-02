@@ -20,14 +20,52 @@ extension CardOpts on CardConfig {
     return this[key]?.toString();
   }
 
-  List<dynamic> listOr(String key) => this[key] is List ? this[key] as List : const [];
+  List<dynamic> listOr(String key) =>
+      this[key] is List ? this[key] as List : const [];
   List<CardConfig> maps(String key) => listOr(key)
-      .map((e) => e is Map ? e.cast<String, dynamic>() : (e is String ? {'entity': e} : null))
+      .map(
+        (e) => e is Map
+            ? e.cast<String, dynamic>()
+            : (e is String ? {'entity': e} : null),
+      )
       .whereType<CardConfig>()
       .toList();
 
   /// `title` wins, `name` is the older spelling, then the entity's own name.
   String titleOr(String fallback) => str('title') ?? str('name') ?? fallback;
+}
+
+/// How the pages are shown: the swipe card's own options. `dots` is the
+/// nspanel-swipe-card spelling, `show_pagination` simple-swipe-card's; both
+/// are honoured so a dashboard moves over by changing one word.
+class PagerOptions {
+  const PagerOptions({this.dots = true, this.start = 0});
+  final bool dots;
+  final int start;
+}
+
+PagerOptions pagerOptionsFromLovelace(Map<String, dynamic> config) {
+  final views = (config['views'] as List?) ?? const [];
+  for (final v in views) {
+    if (v is! Map) continue;
+    for (final c in _cardsOf(v)) {
+      if (cardType(c).endsWith('swipe-card') && c['cards'] is List) {
+        var dots = true;
+        if (c['dots'] is bool) {
+          dots = c['dots'] as bool;
+        } else if (c['show_pagination'] is bool) {
+          dots = c['show_pagination'] as bool;
+        }
+        final n = (c['cards'] as List).length;
+        final start = ((c['start'] as num?)?.toInt() ?? 0).clamp(
+          0,
+          n > 0 ? n - 1 : 0,
+        );
+        return PagerOptions(dots: dots, start: start);
+      }
+    }
+  }
+  return const PagerOptions();
 }
 
 /// Turn a Lovelace dashboard into pages for the panel.
@@ -63,12 +101,18 @@ List<PanelPage> pagesFromLovelace(Map<String, dynamic> config) {
 
 List<CardConfig> _cardsOf(Map v) {
   final direct = (v['cards'] as List?) ?? const [];
-  if (direct.isNotEmpty) return direct.whereType<Map>().map((m) => m.cast<String, dynamic>()).toList();
+  if (direct.isNotEmpty) {
+    return direct
+        .whereType<Map>()
+        .map((m) => m.cast<String, dynamic>())
+        .toList();
+  }
   // sections view: every section's cards, in order
   final sections = (v['sections'] as List?) ?? const [];
   return [
     for (final s in sections.whereType<Map>())
-      for (final c in (s['cards'] as List? ?? const []).whereType<Map>()) c.cast<String, dynamic>(),
+      for (final c in (s['cards'] as List? ?? const []).whereType<Map>())
+        c.cast<String, dynamic>(),
   ];
 }
 
@@ -80,7 +124,10 @@ List<CardConfig> _flatten(CardConfig c) {
   final t = cardType(c);
   if (t == 'nspanel-screensaver') return const [];
   if (t == 'vertical-stack' && c['cards'] is List) {
-    return c.maps('cards').where((x) => cardType(x) != 'nspanel-screensaver').toList();
+    return c
+        .maps('cards')
+        .where((x) => cardType(x) != 'nspanel-screensaver')
+        .toList();
   }
   return [c];
 }

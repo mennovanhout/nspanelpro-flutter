@@ -57,12 +57,30 @@ class _ButtonCardState extends State<ButtonCard> {
     final list = c['buttons'] is List && c.listOr('buttons').isNotEmpty
         ? c.maps('buttons')
         : (c['entity'] != null
-            ? [
-                {'entity': c['entity'], 'name': c.str('title') ?? c.str('name'), 'icon': c['icon']}
-              ]
-            : <CardConfig>[]);
-    return list.where((i) => i['entity'] != null || i['service'] != null).take(6).toList();
+              ? [
+                  {
+                    'entity': c['entity'],
+                    'name': c.str('title') ?? c.str('name'),
+                    'icon': c['icon'],
+                  },
+                ]
+              : <CardConfig>[]);
+    return list
+        .where((i) => i['entity'] != null || i['service'] != null)
+        .take(6)
+        .toList();
   }
+
+  /// What lights the button: `state_entity` when given, else the button's
+  /// own entity - a running script, a switch or boolean that is on.
+  bool _lit(CardConfig item) {
+    final id = item.str('state_entity') ?? item.str('entity');
+    return id != null && widget.env.states.get(id)?.state == 'on';
+  }
+
+  bool _showName(CardConfig item) => item['show_name'] is bool
+      ? item['show_name'] as bool
+      : c.boolOr('show_name', true);
 
   /// Never more columns than buttons: the row is always shared by the buttons
   /// that are in it, and the compact styling belongs to three across.
@@ -71,7 +89,8 @@ class _ButtonCardState extends State<ButtonCard> {
     return c.intOr('columns', 2).clamp(1, 3).clamp(1, _btns.length);
   }
 
-  void _later(VoidCallback fn, int ms) => _timers.add(Timer(Duration(milliseconds: ms), fn));
+  void _later(VoidCallback fn, int ms) =>
+      _timers.add(Timer(Duration(milliseconds: ms), fn));
 
   @override
   void dispose() {
@@ -94,14 +113,20 @@ class _ButtonCardState extends State<ButtonCard> {
       domain = by?.$1 ?? 'homeassistant';
       service = by?.$2 ?? 'toggle';
     }
-    final data = <String, dynamic>{...?(item['data'] as Map?)?.cast<String, dynamic>()};
-    if (entity != null && !data.containsKey('entity_id')) data['entity_id'] = entity;
+    final data = <String, dynamic>{
+      ...?(item['data'] as Map?)?.cast<String, dynamic>(),
+    };
+    if (entity != null && !data.containsKey('entity_id')) {
+      data['entity_id'] = entity;
+    }
     widget.env.conn.callService(domain, service, data);
   }
 
   void _press(_Btn b) {
     if (c.boolOr('haptics', true)) HapticFeedback.lightImpact();
-    final wantsConfirm = b.item['confirm'] is bool ? b.item['confirm'] as bool : c.boolOr('confirm', false);
+    final wantsConfirm = b.item['confirm'] is bool
+        ? b.item['confirm'] as bool
+        : c.boolOr('confirm', false);
     if (wantsConfirm && !b.armed) {
       setState(() => b.armed = true);
       _later(() {
@@ -119,10 +144,17 @@ class _ButtonCardState extends State<ButtonCard> {
 
   @override
   Widget build(BuildContext context) {
-    final ids = [for (final b in _btns) b.item.str('entity')].whereType<String>().toList();
+    final ids = [
+      for (final b in _btns) ...[
+        b.item.str('entity'),
+        b.item.str('state_entity'),
+      ],
+    ].whereType<String>().toList();
     final accent = parseHex(c.str('accent')) ?? Ns.mint;
     return AnimatedBuilder(
-      animation: Listenable.merge([for (final id in ids) widget.env.states.listen(id)]),
+      animation: Listenable.merge([
+        for (final id in ids) widget.env.states.listen(id),
+      ]),
       builder: (context, _) => InfoShell(
         height: c.numOr('height', 200),
         accent: accent,
@@ -136,25 +168,32 @@ class _ButtonCardState extends State<ButtonCard> {
     );
   }
 
-  Widget _tile(_Btn b, Color accent) {
+  Widget _tile(_Btn b, Color cardAccent) {
     final entity = b.item.str('entity');
     final s = entity == null ? null : widget.env.states.get(entity);
     // Not isBroken(): `unknown` is the normal resting state of a scene that has
     // never been fired. Only a missing or unavailable entity is a dead button.
     final broken = entity != null && (s == null || s.state == 'unavailable');
-    final running = s != null && s.state == 'on' && entity!.startsWith('script.');
-    final hot = b.fired || running;
+    final hot = b.fired || _lit(b.item);
     final compact = _columns == 3;
+    // a colour of its own: the lit state uses it instead of the card's accent
+    final accent = parseHex(b.item.str('color')) ?? cardAccent;
+    final showName = _showName(b.item);
 
     final label = b.armed
         ? (b.item.str('confirm_text') ?? c.str('confirm_text') ?? 'Tap again')
-        : (b.item.str('name') ?? (entity != null ? friendlyName(s, entity) : 'Run'));
+        : (b.item.str('name') ??
+              (entity != null ? friendlyName(s, entity) : 'Run'));
     final icon = broken
         ? MdiIcons.alertCircleOutline
         : b.fired
-            ? MdiIcons.check
-            : mdi(b.item.str('icon') ?? s?.attr<String>('icon') ?? _domainIcons[entity?.split('.').first],
-                MdiIcons.gestureTapButton);
+        ? MdiIcons.check
+        : mdi(
+            b.item.str('icon') ??
+                s?.attr<String>('icon') ??
+                _domainIcons[entity?.split('.').first],
+            MdiIcons.gestureTapButton,
+          );
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -170,16 +209,26 @@ class _ButtonCardState extends State<ButtonCard> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: compact ? 32 : 40, color: hot ? accent : Ns.muted),
-              const SizedBox(height: 8),
-              Text(label,
+              Icon(
+                icon,
+                size: showName ? (compact ? 32 : 40) : (compact ? 40 : 48),
+                color: hot ? accent : Ns.muted,
+              ),
+              // icon only, unless it is waiting for the second tap: that has
+              // to be said, so the name's line comes back with "Tap again"
+              if (showName || b.armed) const SizedBox(height: 8),
+              if (showName || b.armed)
+                Text(
+                  label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      color: hot || b.armed ? accent : Ns.text,
-                      fontSize: compact ? 15 : 18,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -.2)),
+                    color: hot || b.armed ? accent : Ns.text,
+                    fontSize: compact ? 15 : 18,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: -.2,
+                  ),
+                ),
             ],
           ),
         ),

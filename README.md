@@ -21,7 +21,9 @@ working - and the panel follows; edit the dashboard and it reloads on its own. T
 config still works in a browser with the web cards, on a phone or a tablet.
 
 The layout it expects is the one the cards' README recommends: a panel view holding a swipe
-card whose children are the pages. A view with no swipe card becomes one page. Cards it does
+card whose children are the pages - `custom:nspanel-swipe-card` from the cards bundle, or
+`custom:simple-swipe-card` if you already have it; the app treats either the same and honours
+`dots: false` (or `show_pagination: false`) and `start`. A view with no swipe card becomes one page. Cards it does
 not know are shown as a marked gap rather than dropped, so you can see what a dashboard is
 asking for that this app cannot do.
 
@@ -29,7 +31,7 @@ asking for that this app cannot do.
 views:
   - type: panel
     cards:
-      - type: custom:simple-swipe-card
+      - type: custom:nspanel-swipe-card
         cards:
           - type: vertical-stack
             cards:

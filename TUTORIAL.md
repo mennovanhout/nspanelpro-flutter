@@ -37,10 +37,11 @@ and the app on each panel follows it — edit it and the panels update themselve
 5. Reload the browser (Home Assistant caches hard; a hard refresh, Ctrl+Shift+R, if the cards
    do not appear in the card picker).
 
-For swiping between pages in the **browser**, also install
-[simple-swipe-card](https://github.com/nutteloost/simple-swipe-card) from HACS. The app does
-not need it — it treats a swipe card's children as pages, and each dashboard view as a page
-when there is no swipe card — but the browser does.
+Swiping between pages needs nothing else: the bundle has its own
+`custom:nspanel-swipe-card`. If you already use
+[simple-swipe-card](https://github.com/nutteloost/simple-swipe-card), keep it - the app
+treats a swipe card's children as pages whichever card it is, and each dashboard view as a
+page when there is no swipe card.
 
 ### 2. Make a dashboard for the panel
 
@@ -60,7 +61,7 @@ title: Dining
 views:
   - type: panel
     cards:
-      - type: custom:simple-swipe-card
+      - type: custom:nspanel-swipe-card
         card_spacing: 12
         cards:
           - type: vertical-stack

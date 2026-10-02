@@ -53,6 +53,9 @@ sounds, TTS through HA, self-update from GitHub Releases, start on boot.
   entities on the device page and are applied in `_saver` through `withOverrides`; the
   entities always show the effective value, and `settings_reset` clears them. Auto
   brightness (`Settings.brightness`) is panel-only, never in the dashboard: it is hardware.
+- **Any `*swipe-card` is the page list** (`pagesFromLovelace`), and its `dots` /
+  `show_pagination` / `start` are the pager's (`pagerOptionsFromLovelace`). Both spellings
+  stay supported: simple-swipe-card dashboards must keep working unchanged.
 - **Card options are the cards repo's.** When adding an option here, add it to the cards repo
   (default literal, README row, editor schema) or document it as native-only in both READMEs.
   Native-only today: `sounds` and `haptics` on the alarm card.
