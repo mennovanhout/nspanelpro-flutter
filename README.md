@@ -1,5 +1,7 @@
 # NSPanel app
 
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-donate-ffdd00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://bunq.me/mennovanhout)
+
 Home Assistant on the Sonoff NSPanel Pro 86, natively.
 
 A Flutter app that renders the `custom:nspanel-*` cards from
