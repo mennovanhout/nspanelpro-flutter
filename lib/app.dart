@@ -31,7 +31,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.5.0';
+const appVersion = '0.5.1';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});
@@ -218,6 +218,20 @@ class _DashboardState extends State<Dashboard> {
     _conn.status.addListener(_onStatus);
     _conn.start();
     _armIdle();
+    // A process that starts with the display asleep - after a self-update
+    // at night, or a crash - would draw the dashboard into a dark screen and
+    // wait. Either pick the dark screensaver up where it was, or wake up.
+    Timer(const Duration(seconds: 2), () async {
+      if (!mounted || await Device.isInteractive()) return;
+      if (_saver?.sleep == true) {
+        debugPrint('display: asleep at start, resuming the screensaver');
+        _dark = true;
+        _sleep();
+      } else {
+        debugPrint('display: asleep at start, waking');
+        _display.on();
+      }
+    });
     _announcer = Announcer(settings: widget.settings, conn: _conn);
     // host and user only - the password never goes anywhere near a log
     debugPrint(
@@ -659,7 +673,12 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Future<void> _goDark() async {
-    if (!_saving || _dark) return;
+    if (!_saving) return;
+    if (_dark) {
+      // already dark (resumed at start): keep the SoC awake for the sensor
+      await Device.holdCpu(true);
+      return;
+    }
     final ok = await _display.off();
     if (!_saving) {
       // woken while the key was in flight: undo it
