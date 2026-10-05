@@ -21,6 +21,7 @@ import 'ha/connection.dart';
 import 'ha/states.dart';
 import 'ha/transport.dart';
 import 'ui/motion.dart';
+import 'ui/page_scope.dart';
 import 'ui/pager.dart';
 import 'ui/screensaver.dart';
 import 'ui/setup_screen.dart';
@@ -31,7 +32,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.5.1';
+const appVersion = '0.6.0';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});
@@ -146,6 +147,10 @@ class Dashboard extends StatefulWidget {
 class _DashboardState extends State<Dashboard> {
   final _frames = FrameWatch();
   int _shown = 0; // the page on screen; only it animates its cards in
+  // the same, and whether the dashboard is visible at all, for cards that
+  // only work while they are on screen (the camera)
+  final _shownPage = ValueNotifier<int>(0);
+  final _awake = ValueNotifier<bool>(true);
   bool _warm = false;
   Timer? _warmTimer;
   late final HaStates _states = HaStates();
@@ -350,15 +355,22 @@ class _DashboardState extends State<Dashboard> {
     });
   }
 
-  Widget _page(PanelPage p, {required bool animate}) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      for (var i = 0; i < p.cards.length; i++) ...[
-        if (i > 0) const SizedBox(height: Ns.gap),
-        // cards rise into place, staggered, when a page first shows
-        Enter(index: i, animate: animate, child: buildCard(p.cards[i], _env)),
+  /// `index` is the page's place in the pager, or -1 for the warm-up's
+  /// hidden copy, which must never count as on screen.
+  Widget _page(PanelPage p, {required bool animate, required int index}) => PageScope(
+    index: index,
+    shown: _shownPage,
+    awake: _awake,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < p.cards.length; i++) ...[
+          if (i > 0) const SizedBox(height: Ns.gap),
+          // cards rise into place, staggered, when a page first shows
+          Enter(index: i, animate: animate, child: buildCard(p.cards[i], _env)),
+        ],
       ],
-    ],
+    ),
   );
 
   void _publishUpdate() {
@@ -660,6 +672,7 @@ class _DashboardState extends State<Dashboard> {
     }
     setState(() {
       _saving = true;
+      _awake.value = false;
       _saverMounted = true;
     });
     debugPrint('screensaver: on (${force ? 'switched on from HA' : 'idle'})');
@@ -715,6 +728,7 @@ class _DashboardState extends State<Dashboard> {
     }
     if (_saving) debugPrint('screensaver: off ($why)');
     if (mounted && _saving) setState(() => _saving = false);
+    _awake.value = true;
     _forcedSaver = null;
     _bridge?.screensaver(false);
     _armIdle();
@@ -774,11 +788,12 @@ class _DashboardState extends State<Dashboard> {
                 jump: _pageJump,
                 onPage: (i) {
                   _shown = i;
+                  _shownPage.value = i;
                   _bridge?.page(i);
                 },
                 pages: [
                   for (var i = 0; i < _pages.length; i++)
-                    _page(_pages[i], animate: i == _shown),
+                    _page(_pages[i], animate: i == _shown, index: i),
                 ],
               )
             else
@@ -799,7 +814,7 @@ class _DashboardState extends State<Dashboard> {
             if (_warm)
               Warmup(
                 onDone: () => setState(() => _warm = false),
-                children: [for (final p in _pages) _page(p, animate: false)],
+                children: [for (final p in _pages) _page(p, animate: false, index: -1)],
               ),
             if (_error != null && _pages.isNotEmpty)
               Positioned(

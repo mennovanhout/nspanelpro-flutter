@@ -53,6 +53,11 @@ sounds, TTS through HA, self-update from GitHub Releases, start on boot.
   entities on the device page and are applied in `_saver` through `withOverrides`; the
   entities always show the effective value, and `settings_reset` clears them. Auto
   brightness (`Settings.brightness`) is panel-only, never in the dashboard: it is hardware.
+- **A card that fetches only does so while it is on screen.** `PageScope` (`lib/ui/page_scope.dart`)
+  wraps every page with its index, the shown page and whether the dashboard is visible; the
+  camera card polls stills only while `active`. The warm-up's hidden copies are index -1 and
+  never active. No stream, no decoder: one scaled JPEG per `interval`, the next asked for
+  after the last arrived.
 - **Any `*swipe-card` is the page list** (`pagesFromLovelace`), and its `dots` /
   `show_pagination` / `start` are the pager's (`pagerOptionsFromLovelace`). Both spellings
   stay supported: simple-swipe-card dashboards must keep working unchanged.

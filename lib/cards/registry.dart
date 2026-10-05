@@ -4,6 +4,7 @@ import '../config/dashboard.dart';
 import '../ui/theme.dart';
 import 'alarm_card.dart';
 import 'button_card.dart';
+import 'camera_card.dart';
 import 'switch_card.dart';
 import 'climate_card.dart';
 import 'clock_card.dart';
@@ -29,6 +30,8 @@ Widget buildCard(CardConfig c, PanelEnv env) {
       return ClimateCard(config: c, env: env);
     case 'nspanel-media-card':
       return MediaCard(config: c, env: env);
+    case 'nspanel-camera-card':
+      return CameraCard(config: c, env: env);
     case 'nspanel-switch-card':
       return SwitchCard(config: c, env: env);
     case 'nspanel-button-card':

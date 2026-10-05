@@ -61,6 +61,13 @@ The switch card is the button card's sibling for switches, input booleans and fa
 is lit while its entity is on, and a tap turns it the other way, echoed at once for
 `echo_ms` so the tile never shows the old state under a finger.
 
+The camera card is a doorbell or a driveway as a still, asked for at the card's own size and
+replaced about once a second - and only while its page is the one showing and the
+screensaver is not up, so a camera on its own page costs nothing the rest of the time. No
+video decoder runs on this hardware; Home Assistant scales the still. With the **Screensaver**
+switch and the **Page** number of the panel's device, a doorbell automation can wake the
+panel, turn to the camera page and ring - the cards README has the automation.
+
 The alarm card is the one with a keypad: when the alarm wants a code, arming or disarming
 opens one full screen, and a refused code says so and clears. It rings the built-in
 `armed`, `disarmed` and `alarm` sounds as the state changes (`sounds: false` to stop it).
@@ -417,7 +424,7 @@ websocket client is a port of the one verified against a fake HA in the cards re
 tested the same way here (`flutter test`).
 
 Not here: Home Assistant's more-info dialog. Where the web cards open it, this app opens the
-card's own sheet (climate) or does nothing (read-only cards). And only these twelve card
+card's own sheet (climate) or does nothing (read-only cards). And only these thirteen card
 types render; this is a panel, not a browser.
 
 ## Layout

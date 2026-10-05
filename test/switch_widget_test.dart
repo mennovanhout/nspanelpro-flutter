@@ -10,7 +10,47 @@ import 'package:nspanel_app/ha/states.dart';
 
 import 'connection_test.dart' show FakeHa, st;
 
+void _iconOnly() {
+  testWidgets('show_name and show_state: the tile can be the icon alone', (tester) async {
+    final fake = FakeHa({
+      'switch.a': st('switch.a', 'on', {'friendly_name': 'Garden lights'}),
+      'switch.b': st('switch.b', 'off', {'friendly_name': 'Fountain'}),
+    });
+    final states = HaStates();
+    final conn = HaConnection(transportFactory: () async => fake, token: 'good', states: states);
+    final ready = Completer<void>();
+    conn.onReady = ready.complete;
+    await conn.start();
+    await ready.future.timeout(const Duration(seconds: 2));
+    final env = PanelEnv(states: states, conn: conn, settings: Settings(url: 'http://x', token: 't'));
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: SwitchCard(
+          config: {
+            'type': 'custom:nspanel-switch-card',
+            'show_name': false,
+            'show_state': false,
+            'switches': [
+              'switch.a',
+              {'entity': 'switch.b', 'show_name': true},
+            ],
+          },
+          env: env,
+        ),
+      ),
+    ));
+    await tester.pump();
+    expect(find.text('Garden lights'), findsNothing);
+    expect(find.text('Fountain'), findsOneWidget, reason: 'this one asked for its name back');
+    expect(find.text('On'), findsNothing);
+    expect(find.text('Off'), findsNothing);
+    expect(tester.widgetList<Icon>(find.byType(Icon)).first.size, 48);
+    unawaited(conn.dispose());
+  });
+}
+
 void main() {
+  _iconOnly();
   testWidgets('a tap is echoed at once, then confirmed by the state; turn_on/turn_off, never toggle',
       (tester) async {
     final fake = FakeHa({
