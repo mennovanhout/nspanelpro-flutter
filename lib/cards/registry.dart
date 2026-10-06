@@ -16,6 +16,7 @@ import 'sensor_card.dart';
 import 'sensors_card.dart';
 import 'status_card.dart';
 import 'weather_card.dart';
+import 'weather_pro_card.dart';
 
 /// `custom:nspanel-*` -> a widget. Anything else says so rather than
 /// vanishing, so a dashboard that mixes in an unsupported card still shows
@@ -46,6 +47,8 @@ Widget buildCard(CardConfig c, PanelEnv env) {
       return StatusCard(config: c, env: env);
     case 'nspanel-weather-card':
       return WeatherCard(config: c, env: env);
+    case 'nspanel-weather-pro-card':
+      return WeatherProCard(config: c, env: env);
     case 'nspanel-clock-card':
       return ClockCard(config: c, env: env);
     case 'nspanel-screensaver':
