@@ -581,3 +581,17 @@ seconds and flushed when an off update arrives. Storage failure falls back to
 session memory. Each client remembers what it has observed itself; changes while
 it was absent cannot be recovered from missing off attributes. No history API,
 background polling, new dependency or HA helper is required.
+
+### Native preview
+
+Actual 480×480 panel captures using simulated lights.
+
+| Dimmer | Tunable white | RGB / last-used slider |
+| --- | --- | --- |
+| ![Dimmer with a 50% brightness fill](docs/images/light-controls/dimmer.png) | ![Tunable-white gradient and matching brightness fill](docs/images/light-controls/tw.png) | ![RGB sliders with hue selected for plus/minus](docs/images/light-controls/rgb.png) |
+
+| Effect favourites | Last values while off |
+| --- | --- |
+| ![Remembered Rainbow effect selected while off](docs/images/light-controls/effects.png) | ![RGB details showing Off · last values after restarting the app](docs/images/light-controls/last-values.png) |
+
+[Capture notes](docs/images/light-controls/README.md).
