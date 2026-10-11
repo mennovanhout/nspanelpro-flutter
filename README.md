@@ -121,6 +121,41 @@ settings** drops the overrides. Nothing has to be typed on the wall and nothing 
 adb; the only thing the setup screen (two-finger hold) still needs is the MQTT broker itself,
 which has to exist before Home Assistant can see the device.
 
+**Display ownership and input safety.** The native app observes touches before Flutter,
+including touches in detail dialogs. Automatic sleep waits until every finger is up
+and then starts the full idle interval. A stationary finger counts as activity. Setup
+is exempt; when another app is foreground, Android/that app owns the display. The
+screensaver is above all app dialogs and waking preserves the page and open dialog.
+
+For direct display-off after 15 seconds, use `after: 15`, `sleep: true`, and
+`sleep_after: 0`. The existing MQTT/HA **Sleep after** setting can later add a visible
+screensaver interval; changing it does not wake a display that is already dark.
+Turning **Sleep** off while dark reveals the screensaver. Neither telemetry nor HA
+state updates reset the idle timer. Configuration overrides keep their usual precedence.
+
+The native-only option `keep_awake_on_proximity: true` (default false) also inhibits
+idle while the sensor detects proximity. Use `proximity_above` or `proximity_below`
+for a calibrated absolute threshold; otherwise a resting baseline is learned.
+Entry requires two readings; release uses 20% hysteresis and 500 ms debounce.
+Unchanging sensor values do not expire. A hand held near the panel is not learned
+as the new baseline. This is short-range proximity, not room occupancy sensing.
+A forced screensaver command suppresses an already-present hand until it leaves
+and approaches again. Touch and an explicit wake command can still wake immediately.
+
+Every physical screen wake starts a fixed 500 ms touch guard, including proximity,
+remote wake and a cold app start with the screen lit. A gesture begun during the
+guard is swallowed through its final release, including extra fingers and long
+presses. A new gesture at 500 ms can operate normally; no extra first tap is required.
+Waking a visible screensaver similarly consumes its wake gesture. A screen-off event
+cancels a forwarded gesture rather than committing its slider value. The guard does
+not add permissions, dashboard options or MQTT topics.
+
+Use exactly one display controller: disable competing custom sleep and wake modules
+in external panel tools when enabling native ownership. Keep their launcher/watchdog
+functions if needed. Preserve a finite Android screen timeout for other apps. The
+native sleep backend still needs local ADB; if it fails, the visible screensaver
+remains and the app logs the failure instead of claiming that the backlight is off.
+
 **Auto brightness.** The same device page has **Auto brightness** with a minimum, a maximum
 and a daylight point: at 0 lx the screen sits at the minimum, at the daylight point (500 lx by
 default, a bright room) and above at the maximum, and in between the level follows the log
