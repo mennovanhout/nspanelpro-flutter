@@ -175,7 +175,9 @@ the existing shadow. Add a fine 1px `ground` shadow contour to keep the glyphs
 legible over bright target fills. Never split the number into light and dark
 regions at the fill boundary. Paint it above the position line. No label box.
 Colour gradients and brightness target fill use full opacity, independently of
-category/action accents. Existing card `follow_color` and explicit accents remain.
+category accents. The power action uses a readable tint of the same target,
+including remembered off values. Explicit `accent` and `follow_color: false`
+still override the action colour. Existing card colours remain unchanged.
 
 Effects and light presets use the two-column 220×76 chooser convention, with fixed Back and Close. Configured effects are explicitly checked against
 capabilities and selection has a check mark. Semantic slider names, values and

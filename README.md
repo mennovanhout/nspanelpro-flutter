@@ -512,8 +512,10 @@ its shared light dialog. Dimmable, tunable-white and colour lights use the same
 layout: tall unlabelled tracks, brightness on the right, then large +/− buttons.
 Horizontal shadow markers show positions. Only brightness shows a percentage; temperature
 and hue/saturation remain available to accessibility tools without visible scales.
-The brightness fill previews the target colour. Card and action accents continue
-to follow `accent` / `follow_color`.
+The brightness fill previews the target colour. The power button uses a readable
+tint of that colour, including remembered values while off. An explicit `accent`
+still wins; `follow_color: false` retains the default action accent. Card colours
+and effect selection accents keep their existing behaviour.
 
 ```yaml
 type: custom:nspanel-light-card

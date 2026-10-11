@@ -567,7 +567,10 @@ class _LightSheetState extends State<LightSheet> {
           : status,
       stateColor: _error != null ? Ns.danger : Ns.muted,
       value: values[LightChannel.brightness]!,
-      accent: accent,
+      accent: controls.accent(
+        s,
+        preview: (p.caps.color || p.white) ? target : null,
+      ),
       fromTop: false,
       step: widget.config.numOr('step', 5),
       showLevel: p.caps.brightness,
