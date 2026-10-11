@@ -255,7 +255,11 @@ class _LightSheetState extends State<LightSheet> {
   }
 
   Future<void> _action(Future<bool> Function() send) async {
-    if (await _send(send) && mounted) Navigator.of(context).pop();
+    if (await _send(send) &&
+        mounted &&
+        ModalRoute.of(context)?.isCurrent == true) {
+      Navigator.of(context).pop();
+    }
   }
 
   void _browse(String? page) => setState(() {

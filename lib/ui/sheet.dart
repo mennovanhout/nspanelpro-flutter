@@ -1,3 +1,5 @@
+import 'navigation_scope.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -72,12 +74,8 @@ Future<void> showControlSheetBuilder(
   BuildContext context,
   WidgetBuilder builder,
 ) {
-  return showGeneralDialog<void>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'close',
-    barrierColor: Ns.ground.withValues(alpha: .72),
-    transitionDuration: const Duration(milliseconds: 180),
+  return showPanelDialog(
+    context,
     transitionBuilder: (_, a, _, child) =>
         FadeTransition(opacity: a, child: child),
     pageBuilder: (ctx, _, _) => builder(ctx),

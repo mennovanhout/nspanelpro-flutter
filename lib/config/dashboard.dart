@@ -39,9 +39,16 @@ extension CardOpts on CardConfig {
 /// nspanel-swipe-card spelling, `show_pagination` simple-swipe-card's; both
 /// are honoured so a dashboard moves over by changing one word.
 class PagerOptions {
-  const PagerOptions({this.dots = true, this.start = 0});
+  const PagerOptions({
+    this.dots = true,
+    this.start = 0,
+    this.returnAfter = 0,
+    this.returnOverrides = const {},
+  });
   final bool dots;
   final int start;
+  final int returnAfter;
+  final Map<int, int> returnOverrides;
 }
 
 PagerOptions pagerOptionsFromLovelace(Map<String, dynamic> config) {
@@ -61,7 +68,19 @@ PagerOptions pagerOptionsFromLovelace(Map<String, dynamic> config) {
           0,
           n > 0 ? n - 1 : 0,
         );
-        return PagerOptions(dots: dots, start: start);
+        final overrides = <int, int>{};
+        for (final item in c.listOr('return_to_start_overrides')) {
+          if (item is! Map) continue;
+          final page = nonNegativeInt(item['page']);
+          final after = nonNegativeInt(item['after']);
+          if (page != null && after != null) overrides[page] = after;
+        }
+        return PagerOptions(
+          dots: dots,
+          start: start,
+          returnAfter: nonNegativeInt(c['return_to_start_after']) ?? 0,
+          returnOverrides: overrides,
+        );
       }
     }
   }
@@ -131,3 +150,12 @@ List<CardConfig> _flatten(CardConfig c) {
   }
   return [c];
 }
+
+int? nonNegativeInt(dynamic value) =>
+    value is num &&
+        value.isFinite &&
+        value >= 0 &&
+        value == value.roundToDouble() &&
+        value <= 9007199254740991
+    ? value.toInt()
+    : null;

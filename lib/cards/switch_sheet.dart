@@ -40,7 +40,7 @@ class _SwitchSheetState extends State<SwitchSheet> {
       on ? 'turn_on' : 'turn_off',
       {'entity_id': entity},
     );
-    if (!mounted) return;
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
     if (ok) {
       Navigator.of(context).pop();
     } else {

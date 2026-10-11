@@ -74,9 +74,10 @@ class MainActivity : FlutterActivity() {
     private var lifecycleGeneration = 0
     private val power get() = getSystemService(Context.POWER_SERVICE) as PowerManager
 
-    private fun emitDisplay(kind: String) {
+    private fun emitDisplay(kind: String, accepted: Boolean = false) {
         displayEvents?.success(mapOf("kind" to kind, "interactive" to power.isInteractive,
-            "foreground" to foreground, "fingers" to fingers))
+            "foreground" to foreground, "fingers" to fingers,
+            "elapsed" to SystemClock.elapsedRealtime(), "accepted" to accepted))
     }
 
     private fun cancelTouch() {
@@ -128,7 +129,7 @@ class MainActivity : FlutterActivity() {
         }
         // All physical fingers inhibit idle, including a swallowed wake gesture.
         // MOVE need not cross the channel: DOWN/UP already bracket its lifetime.
-        if (event.actionMasked != MotionEvent.ACTION_MOVE) emitDisplay("touch")
+        if (event.actionMasked != MotionEvent.ACTION_MOVE) emitDisplay("touch", allow)
         if (start && (!power.isInteractive || wasSaver)) {
             if (power.isInteractive) touchGuard.protect()
             emitDisplay("wake")

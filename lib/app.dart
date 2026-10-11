@@ -1,3 +1,6 @@
+import 'ui/navigation_scope.dart';
+import 'util/navigation_controller.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -164,6 +167,33 @@ class Dashboard extends StatefulWidget {
 
 class _DashboardState extends State<Dashboard> {
   final _frames = FrameWatch();
+  late final _navigation = PanelNavigation(
+    now: () => widget.display.elapsedMilliseconds,
+  );
+  StreamSubscription<Map<String, dynamic>>? _navigationEvents;
+
+  void _navigationEvent(Map<String, dynamic> event) {
+    _navigation.visibility(
+      event['foreground'] == true && event['interactive'] == true,
+    );
+    _navigation.pointers(
+      (event['fingers'] as num?)?.toInt() ?? 0,
+      accepted: event['kind'] == 'touch' && event['accepted'] == true,
+    );
+  }
+
+  void _configureNavigation() {
+    _navigation.configure(
+      count: _pages.length,
+      start: _pager.start,
+      after: _pager.returnAfter,
+      overrides: _pager.returnOverrides,
+      structure: jsonEncode(_pages.map((p) => p.cards).toList()),
+    );
+    _shown = _navigation.current;
+    _shownPage.value = _shown;
+  }
+
   int _shown = 0; // the page on screen; only it animates its cards in
   // the same, and whether the dashboard is visible at all, for cards that
   // only work while they are on screen (the camera)
@@ -193,7 +223,15 @@ class _DashboardState extends State<Dashboard> {
       _lastTouchSerial = serial;
       _bridge?.touched();
     }
-    _awake.value = !_saving && widget.display.controller.interactive;
+    _navigation.visibility(
+      widget.display.controller.foreground &&
+          widget.display.controller.interactive &&
+          !_saving,
+    );
+    _awake.value =
+        widget.display.controller.foreground &&
+        !_saving &&
+        widget.display.controller.interactive;
     _bridge?.screensaver(_saving);
   }
 
@@ -226,6 +264,7 @@ class _DashboardState extends State<Dashboard> {
       conn: _conn,
       settings: widget.settings,
       play: (ref) => _announcer.play(ref),
+      navigation: _navigation,
     );
 
     // Draw the last known dashboard immediately; HA's answer replaces it.
@@ -235,6 +274,7 @@ class _DashboardState extends State<Dashboard> {
         final cfg = (jsonDecode(cached) as Map).cast<String, dynamic>();
         _pages = pagesFromLovelace(cfg);
         _pager = pagerOptionsFromLovelace(cfg);
+        _configureNavigation();
         _scheduleWarmup();
         _saverFromDashboard = ScreensaverConfig.findInLovelace(cfg);
       } catch (_) {
@@ -242,6 +282,10 @@ class _DashboardState extends State<Dashboard> {
       }
     }
 
+    _configureNavigation();
+    _navigationEvents = widget.display.activity.stream.listen(_navigationEvent);
+    final initialEvent = widget.display.lastEvent;
+    if (initialEvent != null) _navigationEvent(initialEvent);
     _conn.onReady = _loadConfig;
     _conn.status.addListener(_onStatus);
     _states.lightMemory.load(widget.settings.url).then((_) {
@@ -270,7 +314,6 @@ class _DashboardState extends State<Dashboard> {
   late final Announcer _announcer;
   PanelBridge? _bridge;
   MqttClient? _mqtt;
-  final _pageJump = ValueNotifier<int>(0);
   StreamSubscription<double>? _proxAlways, _lightSub;
   Timer? _diag;
   Timer? _updateCheck;
@@ -313,7 +356,7 @@ class _DashboardState extends State<Dashboard> {
       },
       onScreensaver: (on) =>
           on ? widget.display.controller.sleep(force: true) : _wake(),
-      onPage: (i) => _pageJump.value = i,
+      onPage: _navigation.navigate,
       onSay: _announcer.say,
       onPlay: _announcer.play,
       onStop: _announcer.stop,
@@ -353,7 +396,7 @@ class _DashboardState extends State<Dashboard> {
       _followLight(lux);
     }, onError: (_) {});
     b.screensaver(_saving);
-    b.page(0);
+    b.page(_navigation.current);
     _publishSettings();
     _publishDiagnostics();
     _diag = Timer.periodic(
@@ -515,7 +558,8 @@ class _DashboardState extends State<Dashboard> {
     _lightSub?.cancel();
     _mqtt?.dispose();
     _announcer.dispose();
-    _pageJump.dispose();
+    _navigationEvents?.cancel();
+    _navigation.dispose();
     widget.display.controller.removeListener(_displayChanged);
     _conn.status.removeListener(_onStatus);
     _unsubLovelace?.call();
@@ -539,6 +583,7 @@ class _DashboardState extends State<Dashboard> {
       setState(() {
         _pages = pages;
         _pager = pagerOptionsFromLovelace(cfg);
+        _configureNavigation();
         _scheduleWarmup();
         _saverFromDashboard = ScreensaverConfig.findInLovelace(cfg);
         // a fresh panel has no cached config, so this is the first moment
@@ -655,96 +700,99 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Listener(
-        onPointerDown: (e) {
-          _feedback();
-          _pointerDown(e);
-        },
-        onPointerMove: (e) {
-          _pointerMove(e);
-        },
-        onPointerUp: (e) {
-          _pointerUp(e.pointer);
-        },
-        onPointerCancel: (e) => _pointerUp(e.pointer),
-        child: Stack(
-          children: [
-            if (_pages.isNotEmpty)
-              PanelPager(
-                key: ValueKey('pager|${_pager.dots}|${_pager.start}'),
-                showDots: _pager.dots,
-                initialPage: _pager.start,
-                jump: _pageJump,
-                onPage: (i) {
-                  _shown = i;
-                  _shownPage.value = i;
-                  _bridge?.page(i);
-                },
-                pages: [
-                  for (var i = 0; i < _pages.length; i++)
-                    _page(_pages[i], animate: i == _shown, index: i),
-                ],
-              )
-            else
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Text(
-                    _error ?? 'Connecting…',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: _error == null ? Ns.muted : Ns.danger,
-                      fontSize: 15,
-                      height: 1.4,
+    return NavigationScope(
+      navigation: _navigation,
+      child: Scaffold(
+        body: Listener(
+          onPointerDown: (e) {
+            _feedback();
+            _pointerDown(e);
+          },
+          onPointerMove: (e) {
+            _pointerMove(e);
+          },
+          onPointerUp: (e) {
+            _pointerUp(e.pointer);
+          },
+          onPointerCancel: (e) => _pointerUp(e.pointer),
+          child: Stack(
+            children: [
+              if (_pages.isNotEmpty)
+                PanelPager(
+                  key: const ValueKey('pager'),
+                  showDots: _pager.dots,
+                  initialPage: _navigation.current,
+                  jump: _navigation,
+                  onPage: (i) {
+                    _shown = i;
+                    _shownPage.value = i;
+                    _bridge?.page(i);
+                  },
+                  pages: [
+                    for (var i = 0; i < _pages.length; i++)
+                      _page(_pages[i], animate: i == _shown, index: i),
+                  ],
+                )
+              else
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      _error ?? 'Connecting…',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: _error == null ? Ns.muted : Ns.danger,
+                        fontSize: 15,
+                        height: 1.4,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            if (_warm)
-              Warmup(
-                onDone: () => setState(() => _warm = false),
-                children: [
-                  for (final p in _pages) _page(p, animate: false, index: -1),
-                ],
-              ),
-            if (_error != null && _pages.isNotEmpty)
-              Positioned(
-                left: 12,
-                right: 12,
-                bottom: 30,
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Ns.surface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(color: Ns.danger, fontSize: 12),
-                  ),
+              if (_warm)
+                Warmup(
+                  onDone: () => setState(() => _warm = false),
+                  children: [
+                    for (final p in _pages) _page(p, animate: false, index: -1),
+                  ],
                 ),
-              ),
-            Positioned(
-              top: 6,
-              right: 8,
-              child: ValueListenableBuilder<HaStatus>(
-                valueListenable: _conn.status,
-                builder: (_, st, _) => AnimatedOpacity(
-                  duration: const Duration(milliseconds: 200),
-                  opacity: st == HaStatus.online ? 0 : 1,
+              if (_error != null && _pages.isNotEmpty)
+                Positioned(
+                  left: 12,
+                  right: 12,
+                  bottom: 30,
                   child: Container(
-                    width: 8,
-                    height: 8,
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: st == HaStatus.connecting ? Ns.gold : Ns.danger,
+                      color: Ns.surface,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Ns.danger, fontSize: 12),
+                    ),
+                  ),
+                ),
+              Positioned(
+                top: 6,
+                right: 8,
+                child: ValueListenableBuilder<HaStatus>(
+                  valueListenable: _conn.status,
+                  builder: (_, st, _) => AnimatedOpacity(
+                    duration: const Duration(milliseconds: 200),
+                    opacity: st == HaStatus.online ? 0 : 1,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: st == HaStatus.connecting ? Ns.gold : Ns.danger,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

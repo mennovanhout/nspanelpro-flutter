@@ -636,3 +636,87 @@ Actual 480×480 panel captures using simulated lights.
 | ![Remembered Rainbow effect selected while off](docs/images/light-controls/effects.png) | ![RGB details showing Off · last values after restarting the app](docs/images/light-controls/last-values.png) |
 
 [Capture notes](docs/images/light-controls/README.md).
+
+
+## Local page navigation and idle return
+
+Buttons can navigate without an entity or a Home Assistant service. Indices are
+zero-based, like `start` and the native MQTT page command:
+
+```yaml
+type: custom:nspanel-button-card
+height: 120
+columns: 3
+haptics: false
+buttons:
+  - name: Lights
+    icon: mdi:lightbulb-group
+    tap_action:
+      action: navigate-page
+      page: 1
+  - name: Covers
+    icon: mdi:window-shutter
+    tap_action:
+      action: navigate-page
+      page: 3
+  - name: Climate
+    icon: mdi:thermostat
+    tap_action:
+      action: navigate-page
+      page: 4
+```
+
+An explicit `tap_action` takes precedence over `entity` and `service`, including
+when invalid: it never falls through to a device command. Only `navigate-page`
+is supported here. `page` must be a nonnegative integer naming an existing page.
+Invalid targets do nothing; unlike the old native MQTT path they are not clamped.
+Repeated commands work after a manual swipe. Existing service/entity buttons
+retain their behavior. Local navigation needs no HA/MQTT connection; native
+page telemetry still reports the page when MQTT is connected.
+
+Configure automatic return on the swipe container:
+
+```yaml
+type: custom:nspanel-swipe-card
+start: 2
+return_to_start_after: 15
+return_to_start_overrides:
+  - page: 5
+    after: 60
+# cards: your existing page list
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `return_to_start_after` | `0` | Nonnegative integer seconds of inactivity. Zero disables the entire feature. |
+| `return_to_start_overrides` | `[]` | Objects with integer `page` and `after`; an override replaces the standard duration on that page. |
+
+With return enabled, `after: 0` disables return on that individual page. Invalid
+entries are ignored; the last valid entry for a repeated index wins. An index
+outside the current page count has no effect. These are general page options:
+there is no camera/entity-specific behavior or display wake lock.
+
+Page entry, an explicit page command, and interaction renew the interval. A held
+finger, including multiple fingers, blocks return; the full interval starts after
+the gesture and swipe settling end. HA updates, camera frames, proximity and
+MQTT telemetry do not count as activity. At expiry, owned NSPanel detail sheets
+and code dialogs close without submitting or committing values, then the start
+page is shown. A sheet on the start page closes too. Already submitted commands
+are not retried. Explicit page commands received during a gesture wait for it to
+end; the latest valid command wins.
+
+Elapsed background/sleep time counts. An overdue return is performed on resume
+without waking the display or stealing focus from another app. Setup is excluded.
+In the browser, HA's own more-info/editor dialogs are an external context: return
+is suspended there and starts a fresh interval after closing. A hidden tab does
+not animate; an overdue return is applied when shown again. Display sleep and
+proximity wake remain separately configured, even on pages with longer intervals.
+
+In the browser each `custom:nspanel-swipe-card` owns its navigation and dialogs;
+nested card events cross shadow roots but cannot move another instance. These
+new web features are not provided by third-party `simple-swipe-card`. The native
+app continues to read existing swipe-card layouts and uses its displayed page
+indices (also used by MQTT); its existing first swipe-container options govern
+its single native pager. Keep the recommended single panel view/container for
+identical page numbering in both renderers. Both new options and nested button
+actions survive the visual editor.

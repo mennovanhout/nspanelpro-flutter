@@ -49,6 +49,13 @@ class DisplaySession {
         .listen(
           (dynamic event) {
             final e = event as Map;
+            final stamp = e['elapsed'];
+            if (stamp is num) {
+              _elapsed = stamp.toInt();
+              _clock.reset();
+            }
+            lastEvent = Map<String, dynamic>.from(e);
+            activity.add(lastEvent!);
             controller.platform(
               kind: e['kind'] as String,
               screenOn: e['interactive'] == true,
@@ -61,6 +68,11 @@ class DisplaySession {
           ),
         );
   }
+  final activity = StreamController<Map<String, dynamic>>.broadcast(sync: true);
+  Map<String, dynamic>? lastEvent;
+  final _clock = Stopwatch()..start();
+  int _elapsed = 0;
+  int get elapsedMilliseconds => _elapsed + _clock.elapsedMilliseconds;
   final controller = DisplayController(NativeDisplayDriver());
   StreamSubscription<dynamic>? _events;
   StreamSubscription<double>? _sensor;
@@ -126,6 +138,7 @@ class DisplaySession {
     _sensor?.cancel();
     _presence?.dispose();
     controller.removeListener(_changed);
+    activity.close();
     controller.dispose();
   }
 }

@@ -1,3 +1,5 @@
+import 'navigation_scope.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -16,23 +18,28 @@ Future<void> showKeypadSheet(
   String hint = 'Enter the code',
   required Future<bool> Function(String code) onSubmit,
 }) {
-  return showGeneralDialog<void>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'close',
-    barrierColor: Ns.ground.withValues(alpha: .72),
-    transitionDuration: const Duration(milliseconds: 180),
+  return showPanelDialog(
+    context,
     transitionBuilder: (_, a, _, child) {
       final curved = CurvedAnimation(parent: a, curve: Curves.easeOutCubic);
       return FadeTransition(
         opacity: a,
         child: SlideTransition(
-          position: Tween(begin: const Offset(0, .03), end: Offset.zero).animate(curved),
+          position: Tween(
+            begin: const Offset(0, .03),
+            end: Offset.zero,
+          ).animate(curved),
           child: child,
         ),
       );
     },
-    pageBuilder: (ctx, _, _) => _Keypad(title: title, accent: accent, text: text, hint: hint, onSubmit: onSubmit),
+    pageBuilder: (ctx, _, _) => _Keypad(
+      title: title,
+      accent: accent,
+      text: text,
+      hint: hint,
+      onSubmit: onSubmit,
+    ),
   );
 }
 
@@ -86,7 +93,7 @@ class _KeypadState extends State<_Keypad> {
     HapticFeedback.mediumImpact();
     setState(() => _busy = true);
     final ok = await widget.onSubmit(code);
-    if (!mounted) return;
+    if (!mounted || ModalRoute.of(context)?.isCurrent != true) return;
     if (ok) {
       Navigator.of(context).pop();
       return;
@@ -119,17 +126,32 @@ class _KeypadState extends State<_Keypad> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(widget.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Ns.text, fontSize: 22, fontWeight: FontWeight.w700)),
-                        Text(_wrong ? 'Wrong code' : widget.hint,
-                            style: TextStyle(
-                                color: _wrong ? Ns.danger : Ns.muted, fontSize: 15, fontWeight: FontWeight.w500)),
+                        Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Ns.text,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          _wrong ? 'Wrong code' : widget.hint,
+                          style: TextStyle(
+                            color: _wrong ? Ns.danger : Ns.muted,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                  _Key(label: '✕', size: 56, onTap: () => Navigator.of(context).pop()),
+                  _Key(
+                    label: '✕',
+                    size: 56,
+                    onTap: () => Navigator.of(context).pop(),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -140,11 +162,18 @@ class _KeypadState extends State<_Keypad> {
                   obscureText: true,
                   onChanged: (_) => setState(() => _wrong = false),
                   onSubmitted: (_) => _submit(),
-                  style: const TextStyle(color: Ns.text, fontSize: 22, letterSpacing: 4),
+                  style: const TextStyle(
+                    color: Ns.text,
+                    fontSize: 22,
+                    letterSpacing: 4,
+                  ),
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: .08),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide.none,
+                    ),
                   ),
                 )
               else ...[
@@ -153,7 +182,11 @@ class _KeypadState extends State<_Keypad> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      for (var i = 0; i < (_code.isEmpty ? 4 : _code.length); i++)
+                      for (
+                        var i = 0;
+                        i < (_code.isEmpty ? 4 : _code.length);
+                        i++
+                      )
                         Container(
                           width: 14,
                           height: 14,
@@ -194,7 +227,8 @@ class _KeypadState extends State<_Keypad> {
                             ],
                           ),
                         ),
-                        if (row.first != '7' || true) const SizedBox(height: 10),
+                        if (row.first != '7' || true)
+                          const SizedBox(height: 10),
                       ],
                     ],
                   ),
@@ -207,9 +241,16 @@ class _KeypadState extends State<_Keypad> {
                   style: FilledButton.styleFrom(
                     backgroundColor: widget.accent,
                     foregroundColor: Ns.ground,
-                    disabledBackgroundColor: widget.accent.withValues(alpha: .35),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                    disabledBackgroundColor: widget.accent.withValues(
+                      alpha: .35,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   onPressed: entered.isEmpty || _busy ? null : _submit,
                   child: Text(_busy ? '…' : widget.title),
@@ -224,7 +265,12 @@ class _KeypadState extends State<_Keypad> {
 }
 
 class _Key extends StatelessWidget {
-  const _Key({required this.label, required this.onTap, this.muted = false, this.size});
+  const _Key({
+    required this.label,
+    required this.onTap,
+    this.muted = false,
+    this.size,
+  });
   final String label;
   final VoidCallback onTap;
   final bool muted;
@@ -232,22 +278,25 @@ class _Key extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          width: size,
-          height: size,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: muted ? .06 : .10),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Text(label,
-              style: TextStyle(
-                  color: muted ? Ns.muted : Ns.text,
-                  fontSize: size != null ? 24 : 26,
-                  fontWeight: FontWeight.w600,
-                  fontFeatures: Ns.tabular)),
+    behavior: HitTestBehavior.opaque,
+    onTap: onTap,
+    child: Container(
+      width: size,
+      height: size,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: muted ? .06 : .10),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: muted ? Ns.muted : Ns.text,
+          fontSize: size != null ? 24 : 26,
+          fontWeight: FontWeight.w600,
+          fontFeatures: Ns.tabular,
         ),
-      );
+      ),
+    ),
+  );
 }

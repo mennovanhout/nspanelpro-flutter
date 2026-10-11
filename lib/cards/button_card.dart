@@ -1,3 +1,5 @@
+import '../util/navigation_controller.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -50,7 +52,7 @@ class _Btn {
 
 class _ButtonCardState extends State<ButtonCard> {
   CardConfig get c => widget.config;
-  late final List<_Btn> _btns = _items().map(_Btn.new).toList();
+  late List<_Btn> _btns = _items().map(_Btn.new).toList();
   final _timers = <Timer>[];
 
   List<CardConfig> _items() {
@@ -66,9 +68,26 @@ class _ButtonCardState extends State<ButtonCard> {
                 ]
               : <CardConfig>[]);
     return list
-        .where((i) => i['entity'] != null || i['service'] != null)
+        .where(
+          (i) =>
+              i['entity'] != null ||
+              i['service'] != null ||
+              i.containsKey('tap_action'),
+        )
         .take(6)
         .toList();
+  }
+
+  @override
+  void didUpdateWidget(ButtonCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.config != widget.config) {
+      for (final timer in _timers) {
+        timer.cancel();
+      }
+      _timers.clear();
+      _btns = _items().map(_Btn.new).toList();
+    }
   }
 
   /// What lights the button: `state_entity` when given, else the button's
@@ -100,7 +119,11 @@ class _ButtonCardState extends State<ButtonCard> {
     super.dispose();
   }
 
-  void _fire(CardConfig item) {
+  bool _fire(CardConfig item) {
+    if (item.containsKey('tap_action')) {
+      final page = navigationTarget(item['tap_action']);
+      return page != null && (widget.env.navigation?.navigate(page) ?? false);
+    }
     final explicit = item.str('service');
     final entity = item.str('entity');
     String domain, service;
@@ -120,6 +143,7 @@ class _ButtonCardState extends State<ButtonCard> {
       data['entity_id'] = entity;
     }
     widget.env.conn.callService(domain, service, data);
+    return true;
   }
 
   void _press(_Btn b) {
@@ -135,7 +159,7 @@ class _ButtonCardState extends State<ButtonCard> {
       return;
     }
     b.armed = false;
-    _fire(b.item);
+    if (!_fire(b.item)) return;
     setState(() => b.fired = true);
     _later(() {
       if (mounted) setState(() => b.fired = false);
@@ -153,6 +177,7 @@ class _ButtonCardState extends State<ButtonCard> {
     final accent = parseHex(c.str('accent')) ?? Ns.mint;
     return AnimatedBuilder(
       animation: Listenable.merge([
+        if (widget.env.navigation != null) widget.env.navigation!,
         for (final id in ids) widget.env.states.listen(id),
       ]),
       builder: (context, _) => InfoShell(
@@ -173,7 +198,11 @@ class _ButtonCardState extends State<ButtonCard> {
     final s = entity == null ? null : widget.env.states.get(entity);
     // Not isBroken(): `unknown` is the normal resting state of a scene that has
     // never been fired. Only a missing or unavailable entity is a dead button.
-    final broken = entity != null && (s == null || s.state == 'unavailable');
+    final local = b.item.containsKey('tap_action');
+    final page = navigationTarget(b.item['tap_action']);
+    final broken = local
+        ? page == null || !(widget.env.navigation?.valid(page) ?? false)
+        : entity != null && (s == null || s.state == 'unavailable');
     final hot = b.fired || _lit(b.item);
     final compact = _columns == 3;
     // a colour of its own: the lit state uses it instead of the card's accent
