@@ -23,7 +23,7 @@ import 'ha/transport.dart';
 import 'ui/motion.dart';
 import 'ui/page_scope.dart';
 import 'ui/pager.dart';
-import 'ui/screensaver.dart';
+import 'ui/display_overlay.dart';
 import 'ui/setup_screen.dart';
 import 'ui/theme.dart';
 import 'ui/warmup.dart';
@@ -54,21 +54,8 @@ class _NsPanelAppState extends State<NsPanelApp> {
     debugShowCheckedModeBanner: false,
     theme: Ns.theme(),
     home: Shell(display: _display),
-    builder: (context, child) => ListenableBuilder(
-      listenable: _display.controller,
-      builder: (context, _) => Stack(
-        children: [
-          child!,
-          if (_display.controller.enabled && _display.controller.saving)
-            Positioned.fill(
-              child: Screensaver(
-                config: _display.controller.effective,
-                onWake: _display.controller.wake,
-              ),
-            ),
-        ],
-      ),
-    ),
+    builder: (context, child) =>
+        DisplayOverlay(controller: _display.controller, child: child!),
   );
 }
 
