@@ -213,12 +213,22 @@ class _SwitchCardState extends State<SwitchCard> {
         ? 'Unavailable'
         : (on ? c.str('on_text') ?? 'On' : c.str('off_text') ?? 'Off');
 
+    final swap = sw.item.boolOr(
+      'swap_press_actions',
+      c.boolOr('swap_press_actions', false),
+    );
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: broken ? null : () => _press(sw),
+      onTap: swap ? () => _details(sw) : (broken ? null : () => _press(sw)),
       // Recognize even a disabled hold, so releasing it cannot become a tap.
       // Flutter's gesture arena gives horizontal drags back to the pager.
-      onLongPress: () => _details(sw),
+      onLongPress: () {
+        if (swap) {
+          if (!broken) _press(sw);
+        } else {
+          _details(sw);
+        }
+      },
       child: Opacity(
         opacity: broken ? .45 : 1,
         child: Container(

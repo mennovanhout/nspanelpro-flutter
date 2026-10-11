@@ -38,6 +38,10 @@ class _LightCardState extends State<LightCard> with EchoMixin {
     if (pct is num && p['scene'] == null) holdLocal(pct / 100, echoMs);
   }
 
+  void _details() {
+    if (c.str('long_press') != 'none') _openSheet();
+  }
+
   void _openSheet() {
     if (!capabilities.available) return;
     showControlSheetBuilder(
@@ -98,8 +102,12 @@ class _LightCardState extends State<LightCard> with EchoMixin {
                     ),
                 ]
               : const [],
-          onTap: () => controls.call('toggle'),
-          onLongPress: c.str('long_press') == 'none' ? () {} : _openSheet,
+          onTap: c.boolOr('swap_press_actions', false)
+              ? _details
+              : () => controls.call('toggle'),
+          onLongPress: c.boolOr('swap_press_actions', false)
+              ? () => controls.call('toggle')
+              : _details,
           onDragValue: !caps.brightness
               ? null
               : (nv) {
