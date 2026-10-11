@@ -13,7 +13,7 @@ in the contribution.
 - `effects.png`: Rainbow remembered and selected while the light is off.
 - `last-values.png`: RGB details after restarting the application while the
   simulated server reports only off states with missing colour/brightness values.
-  The power action retains the remembered target tint instead of falling back to amber.
+  The power action remains neutral while off; the sliders retain the remembered colour.
 
 The SONOFF floating back button was temporarily disabled during capture; the
 screen contents were not retouched. Its original setting was restored afterward.
