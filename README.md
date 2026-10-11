@@ -720,3 +720,12 @@ indices (also used by MQTT); its existing first swipe-container options govern
 its single native pager. Keep the recommended single panel view/container for
 identical page numbering in both renderers. Both new options and nested button
 actions survive the visual editor.
+
+### Navigation example on the panel
+
+Actual 480×480 panel captures with simulated entities. The demonstration uses a
+3-second idle interval to make the return visible; the default remains disabled.
+
+| Local command to page 1 | Idle return to start page 2 |
+| --- | --- |
+| ![Local navigation to page 1](docs/images/navigation/page-1.png) | ![Automatic return to start page 2](docs/images/navigation/idle-home.png) |
