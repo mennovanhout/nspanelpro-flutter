@@ -109,6 +109,9 @@ class _FillCardState extends State<FillCard> {
   }
 
   void _onDragCancel() {
+    // Losing the gesture arena to a tap or hold is not an aborted drag.
+    // Only discard a local drag value after a drag actually started.
+    if (!_dragging) return;
     _dragging = false;
     widget.onDragCancel?.call();
     setState(() {});

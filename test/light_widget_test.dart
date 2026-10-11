@@ -62,6 +62,31 @@ Future<(FakeHa, HaStates)> mount(
 }
 
 void main() {
+  testWidgets(
+    'opening details preserves the card echo over a stale HA update',
+    (tester) async {
+      final (_, states) = await mount(tester, ['brightness']);
+      await tester.tap(find.text('Mid'));
+      await tester.pump();
+      states.update(
+        'light.test',
+        const HaState(
+          entityId: 'light.test',
+          state: 'on',
+          attributes: {
+            'supported_color_modes': ['brightness'],
+            'brightness': 25,
+            'friendly_name': 'Test light',
+          },
+        ),
+      );
+      await tester.pump();
+      await tester.longPress(find.text('Test light'));
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(tester.widget<ControlSheet>(find.byType(ControlSheet)).value, 0.5);
+    },
+  );
+
   testWidgets('onoff: no level controls; hold and vertical drag never toggle', (
     tester,
   ) async {

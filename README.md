@@ -61,6 +61,21 @@ The switch card is the button card's sibling for switches, input booleans and fa
 is lit while its entity is on, and a tap turns it the other way, echoed at once for
 `echo_ms` so the tile never shows the old state under a finger.
 
+Hold a switch tile to open native details (`more_info: true`, the default); set
+`more_info: false` to disable details. Releasing a hold never also toggles the entity,
+and horizontal swipes still belong to the pager. Light entities use the same
+capability-aware dialog as light cards: relay lights have only on/off; dimmable lights
+keep brightness controls while off. Switches, input booleans and fans initially offer
+on/off only. Other domains show their reported state without guessing device controls.
+These are small native dialogs, not the full Home Assistant web more-info frontend;
+fan speed and a free color picker are not implemented here.
+
+Details follow live HA changes. Missing, unknown or unavailable entities can be
+inspected but cannot be operated. A refused on/off command in a switch/input-boolean/fan
+dialog leaves it open with an error; a refused tile tap clears its optimistic echo.
+Opening and closing details never sends a service call.
+
+
 The camera card is a doorbell or a driveway as a still, asked for at the card's own size and
 replaced about once a second - and only while its page is the one showing and the
 screensaver is not up, so a camera on its own page costs nothing the rest of the time. No
