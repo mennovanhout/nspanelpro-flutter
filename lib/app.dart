@@ -12,7 +12,7 @@ import 'mqtt/bridge.dart';
 import 'mqtt/client.dart';
 import 'util/auto_brightness.dart';
 import 'util/device.dart';
-import 'util/display.dart';
+import 'util/display_session.dart';
 import 'util/frames.dart';
 import 'config/dashboard.dart';
 import 'config/screensaver.dart';
@@ -23,7 +23,7 @@ import 'ha/transport.dart';
 import 'ui/motion.dart';
 import 'ui/page_scope.dart';
 import 'ui/pager.dart';
-import 'ui/screensaver.dart';
+import 'ui/display_overlay.dart';
 import 'ui/setup_screen.dart';
 import 'ui/theme.dart';
 import 'ui/warmup.dart';
@@ -34,21 +34,35 @@ import 'util/proximity.dart';
 /// pubspec.yaml.
 const appVersion = '0.6.0';
 
-class NsPanelApp extends StatelessWidget {
+class NsPanelApp extends StatefulWidget {
   const NsPanelApp({super.key});
+  @override
+  State<NsPanelApp> createState() => _NsPanelAppState();
+}
+
+class _NsPanelAppState extends State<NsPanelApp> {
+  late final DisplaySession _display = DisplaySession();
+  @override
+  void dispose() {
+    _display.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'NSPanel',
     debugShowCheckedModeBanner: false,
     theme: Ns.theme(),
-    home: const Shell(),
+    home: Shell(display: _display),
+    builder: (context, child) =>
+        DisplayOverlay(controller: _display.controller, child: child!),
   );
 }
 
 /// Setup screen until there is a token; the dashboard after.
 class Shell extends StatefulWidget {
-  const Shell({super.key});
+  const Shell({super.key, required this.display});
+  final DisplaySession display;
 
   @override
   State<Shell> createState() => _ShellState();
@@ -115,7 +129,9 @@ class _ShellState extends State<Shell> {
         ),
         settings: _settings!,
         updater: _updater!,
+        display: widget.display,
         onReconfigure: (msg) => setState(() {
+          widget.display.configure(null, active: false);
           _showSetup = true;
           _setupMessage = msg;
         }),
@@ -135,8 +151,10 @@ class Dashboard extends StatefulWidget {
     required this.settings,
     required this.updater,
     required this.onReconfigure,
+    required this.display,
   });
   final Settings settings;
+  final DisplaySession display;
   final Updater updater;
   final ValueChanged<String?> onReconfigure;
 
@@ -164,17 +182,22 @@ class _DashboardState extends State<Dashboard> {
 
   // screensaver: the dashboard card wins, then setup.json, then none
   ScreensaverConfig? _saverFromDashboard;
-  bool _saving = false;
-  // the screensaver's sleep option: the display goes dark sleep_after
-  // seconds in, and comes back on whatever wakes the screensaver
-  final _display = DisplayPower();
-  Timer? _darkTimer;
-  bool _dark = false;
-  Timer? _idle;
-  StreamSubscription<double>? _prox;
+  bool get _saving => widget.display.controller.saving;
+
+  void _configureDisplay() => widget.display.configure(_saver, active: true);
+
+  int _lastTouchSerial = 0;
+  void _displayChanged() {
+    final serial = widget.display.controller.touchSerial;
+    if (serial != _lastTouchSerial) {
+      _lastTouchSerial = serial;
+      _bridge?.touched();
+    }
+    _awake.value = !_saving && widget.display.controller.interactive;
+    _bridge?.screensaver(_saving);
+  }
 
   ScreensaverConfig? get _saver {
-    if (_forcedSaver != null) return _forcedSaver;
     final base =
         _saverFromDashboard ??
         (widget.settings.screensaver == null
@@ -222,19 +245,11 @@ class _DashboardState extends State<Dashboard> {
     _conn.onReady = _loadConfig;
     _conn.status.addListener(_onStatus);
     _conn.start();
-    _armIdle();
-    // A process that starts with the display asleep - after a self-update
-    // at night, or a crash - would draw the dashboard into a dark screen and
-    // wait. Either pick the dark screensaver up where it was, or wake up.
-    Timer(const Duration(seconds: 2), () async {
-      if (!mounted || await Device.isInteractive()) return;
-      if (_saver?.sleep == true) {
-        debugPrint('display: asleep at start, resuming the screensaver');
-        _dark = true;
-        _sleep();
-      } else {
-        debugPrint('display: asleep at start, waking');
-        _display.on();
+    widget.display.controller.addListener(_displayChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _configureDisplay();
+        _displayChanged();
       }
     });
     _announcer = Announcer(settings: widget.settings, conn: _conn);
@@ -294,7 +309,8 @@ class _DashboardState extends State<Dashboard> {
       onVolume: (v) async {
         if (await Device.setVolume(v)) _bridge?.volume(v);
       },
-      onScreensaver: (on) => on ? _sleep(force: true) : _wake(),
+      onScreensaver: (on) =>
+          on ? widget.display.controller.sleep(force: true) : _wake(),
       onPage: (i) => _pageJump.value = i,
       onSay: _announcer.say,
       onPlay: _announcer.play,
@@ -357,7 +373,11 @@ class _DashboardState extends State<Dashboard> {
 
   /// `index` is the page's place in the pager, or -1 for the warm-up's
   /// hidden copy, which must never count as on screen.
-  Widget _page(PanelPage p, {required bool animate, required int index}) => PageScope(
+  Widget _page(
+    PanelPage p, {
+    required bool animate,
+    required int index,
+  }) => PageScope(
     index: index,
     shown: _shownPage,
     awake: _awake,
@@ -443,25 +463,12 @@ class _DashboardState extends State<Dashboard> {
     await st.save();
     debugPrint('settings: $object = $value');
     _publishSettings();
-    // a new idle timeout counts from now; a sleep change applies to the
-    // screensaver that is running
-    if (!_saving) {
-      _armIdle();
-    } else if (_saver?.sleep == true && !_dark && _darkTimer == null) {
-      _darkTimer = Timer(Duration(seconds: _saver!.sleepAfterSeconds), _goDark);
-    } else if (_saver?.sleep == false) {
-      _darkTimer?.cancel();
-      _darkTimer = null;
-      if (_dark) {
-        _dark = false;
-        _display.on();
-      }
-    }
+    _configureDisplay();
   }
 
   void _followLight(double lux) {
     final st = widget.settings;
-    if (!st.autoBrightness || _dark) return;
+    if (!st.autoBrightness || !widget.display.controller.interactive) return;
     final level = _follower.feed(
       lux,
       min: st.brightnessMin,
@@ -507,9 +514,7 @@ class _DashboardState extends State<Dashboard> {
     _mqtt?.dispose();
     _announcer.dispose();
     _pageJump.dispose();
-    _idle?.cancel();
-    _prox?.cancel();
-    _darkTimer?.cancel();
+    widget.display.controller.removeListener(_displayChanged);
     _conn.status.removeListener(_onStatus);
     _unsubLovelace?.call();
     _conn.dispose();
@@ -536,7 +541,7 @@ class _DashboardState extends State<Dashboard> {
         // a fresh panel has no cached config, so this is the first moment
         // there is a screensaver to arm; a touch would arm it too, but a
         // panel nobody touches should still go to sleep
-        if (!_saving) _armIdle();
+        _configureDisplay();
         _error = pages.isEmpty
             ? 'The dashboard "${path.isEmpty ? 'default' : path}" has no cards this app can '
                   'draw. It needs custom:nspanel-* cards.'
@@ -623,18 +628,7 @@ class _DashboardState extends State<Dashboard> {
 
   // ---- idle / screensaver -------------------------------------------------
 
-  void _armIdle() {
-    _idle?.cancel();
-    final s = _saver;
-    if (s == null) return;
-    _idle = Timer(Duration(seconds: s.afterSeconds.clamp(10, 86400)), _sleep);
-  }
-
-  void _touched() {
-    _bridge?.touched();
-    if (_saving) return; // the overlay handles its own wake
-    _armIdle();
-  }
+  void _wake() => widget.display.controller.wake();
 
   /// Every touch-down clicks and, when the panel has a motor, buzzes -
   /// fired here, at the touch, not when a card decides what it meant, so
@@ -656,125 +650,18 @@ class _DashboardState extends State<Dashboard> {
 
   bool _hasVibrator = false;
 
-  // _saving is the target state; _saverMounted keeps the overlay in the tree
-  // while it fades out, so the dashboard is touchable the moment it starts.
-  bool _saverMounted = false;
-
-  /// `force` is Home Assistant switching the screensaver on: it works even
-  /// with none configured, as a clock on black.
-  ScreensaverConfig? _forcedSaver;
-
-  void _sleep({bool force = false}) {
-    if (!mounted) return;
-    if (_saver == null) {
-      if (!force) return;
-      _forcedSaver = const ScreensaverConfig();
-    }
-    setState(() {
-      _saving = true;
-      _awake.value = false;
-      _saverMounted = true;
-    });
-    debugPrint('screensaver: on (${force ? 'switched on from HA' : 'idle'})');
-    _bridge?.screensaver(true);
-    _watchProximity();
-    final s = _saver;
-    if (s != null && s.sleep) {
-      _darkTimer?.cancel();
-      _darkTimer = Timer(Duration(seconds: s.sleepAfterSeconds), _goDark);
-    }
-  }
-
-  Future<void> _goDark() async {
-    if (!_saving) return;
-    if (_dark) {
-      // already dark (resumed at start): keep the SoC awake for the sensor
-      await Device.holdCpu(true);
-      return;
-    }
-    final ok = await _display.off();
-    if (!_saving) {
-      // woken while the key was in flight: undo it
-      if (ok) await _display.on();
-      return;
-    }
-    _dark = ok;
-    debugPrint(ok ? 'display: off' : 'display: stays on (see above)');
-    // The backlight is part of what the sensor reads: the resting level
-    // shifts when it goes off (351 dark against 405 lit on one wall here),
-    // and a baseline learned while it was still on reads that shift as an
-    // approach and wakes the panel straight back up. So learn it again now.
-    if (ok) {
-      _prox?.cancel();
-      _watchProximity();
-    }
-  }
-
-  void _wake([String why = 'touch or HA']) {
-    _prox?.cancel();
-    _prox = null;
-    _darkTimer?.cancel();
-    _darkTimer = null;
-    if (_dark) {
-      _dark = false;
-      debugPrint('display: on');
-      _display.on();
-    } else {
-      // a process that started while the display was asleep (an update, a
-      // crash) has never been dark itself, but the screen still needs to come on
-      Device.isInteractive().then((on) {
-        if (!on) _display.on();
-      });
-    }
-    if (_saving) debugPrint('screensaver: off ($why)');
-    if (mounted && _saving) setState(() => _saving = false);
-    _awake.value = true;
-    _forcedSaver = null;
-    _bridge?.screensaver(false);
-    _armIdle();
-  }
-
-  /// Wake on approach; the reading of the sensor is [ApproachDetector]'s.
-  void _watchProximity() {
-    final s = _saver;
-    if (s == null || !s.wakeOnProximity) return;
-    final detector = ApproachDetector(
-      delta: s.proximityDelta,
-      below: s.proximityBelow,
-      above: s.proximityAbove,
-    );
-    var logged = false;
-    _prox = Proximity.stream.listen(
-      (v) {
-        if (detector.feed(v)) {
-          _wake('approach: reading $v, resting ${detector.resting}');
-        }
-        if (!logged && detector.resting != null) {
-          logged = true;
-          debugPrint('proximity: resting at ${detector.resting}');
-        }
-      },
-      onError: (_) {
-        // no sensor on this device; touch still wakes it
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Listener(
         onPointerDown: (e) {
-          _touched();
           _feedback();
           _pointerDown(e);
         },
         onPointerMove: (e) {
-          _touched();
           _pointerMove(e);
         },
         onPointerUp: (e) {
-          _touched();
           _pointerUp(e.pointer);
         },
         onPointerCancel: (e) => _pointerUp(e.pointer),
@@ -814,7 +701,9 @@ class _DashboardState extends State<Dashboard> {
             if (_warm)
               Warmup(
                 onDone: () => setState(() => _warm = false),
-                children: [for (final p in _pages) _page(p, animate: false, index: -1)],
+                children: [
+                  for (final p in _pages) _page(p, animate: false, index: -1),
+                ],
               ),
             if (_error != null && _pages.isNotEmpty)
               Positioned(
@@ -831,16 +720,6 @@ class _DashboardState extends State<Dashboard> {
                     _error!,
                     style: const TextStyle(color: Ns.danger, fontSize: 12),
                   ),
-                ),
-              ),
-            if (_saverMounted && _saver != null)
-              Positioned.fill(
-                child: Reveal(
-                  visible: _saving,
-                  onHidden: () {
-                    if (mounted) setState(() => _saverMounted = false);
-                  },
-                  child: Screensaver(config: _saver!, onWake: _wake),
                 ),
               ),
             Positioned(

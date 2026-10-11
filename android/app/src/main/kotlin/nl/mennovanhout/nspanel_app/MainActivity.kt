@@ -1,5 +1,13 @@
 package nl.mennovanhout.nspanel_app
 
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
+import android.view.MotionEvent
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -22,6 +30,141 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private lateinit var touchGuard: WakeTouchGuard
+    private var displayEvents: EventChannel.EventSink? = null
+    private var saverVisible = false
+    private var nativeIdleTimeout: Int? = null
+    private var displayLock: PowerManager.WakeLock? = null
+    private val awakeHold = DisplayAwakeHold(
+        acquire = {
+            // NSPanel firmware can drop WindowManager's KEEP_SCREEN_ON lock
+            // after waking. Hold our own while the app owns the awake display.
+            // No ACQUIRE_CAUSES_WAKEUP: sleep events must remain authoritative.
+            @Suppress("DEPRECATION")
+            val lock = power.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                PowerManager.ON_AFTER_RELEASE, "nspanel:display")
+            lock.setReferenceCounted(false)
+            lock.acquire()
+            displayLock = lock
+        },
+        release = {
+            displayLock?.let { if (it.isHeld) it.release() }
+            displayLock = null
+        })
+    private fun updateAwakeHold() {
+        awakeHold.update(nativeIdleTimeout != null, foreground, power.isInteractive)
+    }
+    private fun restoreSystemTimeout() {
+        val timeout = nativeIdleTimeout ?: return
+        if (Settings.System.canWrite(this) && Settings.System.getInt(contentResolver,
+                Settings.System.SCREEN_OFF_TIMEOUT, -1) != timeout) {
+            Settings.System.putInt(contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, timeout)
+        }
+    }
+    private var foreground = true
+    private var fingers = 0
+    private var lastTouch: MotionEvent? = null
+    private var receiverRegistered = false
+    private val displayHandler = Handler(Looper.getMainLooper())
+    private val timeoutObserver = object : ContentObserver(displayHandler) {
+        override fun onChange(selfChange: Boolean) {
+            if (foreground) restoreSystemTimeout()
+        }
+    }
+    private var lifecycleGeneration = 0
+    private val power get() = getSystemService(Context.POWER_SERVICE) as PowerManager
+
+    private fun emitDisplay(kind: String) {
+        displayEvents?.success(mapOf("kind" to kind, "interactive" to power.isInteractive,
+            "foreground" to foreground, "fingers" to fingers))
+    }
+
+    private fun cancelTouch() {
+        lastTouch?.let { previous ->
+            val cancel = MotionEvent.obtain(previous)
+            cancel.action = MotionEvent.ACTION_CANCEL
+            super.dispatchTouchEvent(cancel)
+            cancel.recycle()
+        }
+        fingers = 0
+        lastTouch?.recycle()
+        lastTouch = null
+    }
+
+    private fun syncScreen() {
+        updateAwakeHold()
+        if (!::touchGuard.isInitialized) return
+        val on = power.isInteractive
+        val wentOff = touchGuard.interactive && !on
+        if (touchGuard.screen(on)) cancelTouch()
+        else if (wentOff) {
+            fingers = 0
+            lastTouch?.recycle()
+            lastTouch = null
+        }
+    }
+
+    private val displayReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            syncScreen()
+            if (intent.action == "android.system.gestures.touchDown") {
+                if (!power.isInteractive && foreground) emitDisplay("wake")
+            } else {
+                emitDisplay("screen")
+            }
+        }
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        syncScreen()
+        val start = event.actionMasked == MotionEvent.ACTION_DOWN
+        val finish = event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL
+        val wasSaver = saverVisible
+        val allow = touchGuard.allow(start, finish, event.downTime, wasSaver)
+        fingers = when (event.actionMasked) {
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> 0
+            MotionEvent.ACTION_POINTER_UP -> event.pointerCount - 1
+            else -> event.pointerCount
+        }
+        // All physical fingers inhibit idle, including a swallowed wake gesture.
+        // MOVE need not cross the channel: DOWN/UP already bracket its lifetime.
+        if (event.actionMasked != MotionEvent.ACTION_MOVE) emitDisplay("touch")
+        if (start && (!power.isInteractive || wasSaver)) {
+            if (power.isInteractive) touchGuard.protect()
+            emitDisplay("wake")
+        }
+        if (!allow) return true
+        lastTouch?.recycle()
+        lastTouch = if (finish) null else MotionEvent.obtain(event)
+        return super.dispatchTouchEvent(event)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        lifecycleGeneration++
+        foreground = true
+        restoreSystemTimeout()
+        syncScreen()
+        emitDisplay("lifecycle")
+    }
+
+    override fun onPause() {
+        super.onPause()
+        val generation = ++lifecycleGeneration
+        // SCREEN_OFF and onPause may arrive in either order. Sleeping our own
+        // activity must keep the sensor alive; another foreground app must not.
+        displayHandler.postDelayed({
+            if (generation == lifecycleGeneration && power.isInteractive) {
+                restoreSystemTimeout()
+                foreground = false
+                updateAwakeHold()
+                if (::touchGuard.isInitialized && touchGuard.cancel()) cancelTouch()
+                fingers = 0
+                emitDisplay("lifecycle")
+            }
+        }, 200)
+    }
+
     private var proximityListener: SensorEventListener? = null
     private var lightListener: SensorEventListener? = null
 
@@ -50,6 +193,17 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        touchGuard = WakeTouchGuard({ SystemClock.uptimeMillis() }, power.isInteractive)
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_SCREEN_ON)
+            addAction(Intent.ACTION_SCREEN_OFF)
+            addAction("android.system.gestures.touchDown")
+        }
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(displayReceiver, filter, Context.RECEIVER_EXPORTED)
+        else @Suppress("DEPRECATION") registerReceiver(displayReceiver, filter)
+        receiverRegistered = true
+        contentResolver.registerContentObserver(
+            Settings.System.getUriFor(Settings.System.SCREEN_OFF_TIMEOUT), false, timeoutObserver)
         // A wall panel that goes to sleep is a wall. No plugin needed for one flag.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
@@ -78,6 +232,37 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         loadTick() // ahead of the first touch, which would otherwise be silent
         val messenger = flutterEngine.dartExecutor.binaryMessenger
+        EventChannel(messenger, "nl.mennovanhout.nspanel/displayEvents").setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
+                    displayEvents = events
+                    emitDisplay("snapshot")
+                }
+                override fun onCancel(arguments: Any?) { displayEvents = null }
+            })
+        MethodChannel(messenger, "nl.mennovanhout.nspanel/displayControl").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "idleTimeout" -> {
+                    nativeIdleTimeout = (call.arguments as? Number)?.toInt()?.coerceIn(10000, 86400000)
+                    restoreSystemTimeout()
+                    updateAwakeHold()
+                    result.success(null)
+                }
+                "saver" -> {
+                    val wasSaver = saverVisible
+                    saverVisible = call.arguments == true
+                    if (wasSaver && !saverVisible && ::touchGuard.isInitialized && power.isInteractive) {
+                        touchGuard.protect()
+                    }
+                    if (saverVisible && ::touchGuard.isInitialized && touchGuard.cancel()) {
+                        cancelTouch()
+                        emitDisplay("snapshot")
+                    }
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
         val sensors = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val proximity = sensors.getDefaultSensor(Sensor.TYPE_PROXIMITY)
         val light = sensors.getDefaultSensor(Sensor.TYPE_LIGHT)
@@ -194,6 +379,16 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        awakeHold.update(false, false, false)
+        lifecycleGeneration++
+        displayHandler.removeCallbacksAndMessages(null)
+        if (receiverRegistered) {
+            unregisterReceiver(displayReceiver)
+            contentResolver.unregisterContentObserver(timeoutObserver)
+        }
+        displayEvents = null
+        lastTouch?.recycle()
+        lastTouch = null
         pool?.release()
         pool = null
         cpuLock?.let { if (it.isHeld) it.release() }
