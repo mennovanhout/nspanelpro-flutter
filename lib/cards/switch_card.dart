@@ -48,6 +48,11 @@ class _Sw {
   _Sw(this.item);
   final CardConfig item;
   String get entity => item['entity'].toString();
+  String get detailEntity {
+    final value = item['detail_entity'];
+    return value is String && value.trim().isNotEmpty ? value.trim() : entity;
+  }
+
   bool? local;
   int revision = 0;
   DateTime localUntil = DateTime.fromMillisecondsSinceEpoch(0);
@@ -65,6 +70,7 @@ class _SwitchCardState extends State<SwitchCard> {
               ? [
                   {
                     'entity': c['entity'],
+                    'detail_entity': c['detail_entity'],
                     'name': c.str('title') ?? c.str('name'),
                     'icon': c['icon'],
                   },
@@ -132,8 +138,9 @@ class _SwitchCardState extends State<SwitchCard> {
 
   void _details(_Sw sw) {
     if (!c.boolOr('more_info', true)) return;
+    final entity = sw.detailEntity;
     final config = <String, dynamic>{
-      'entity': sw.entity,
+      'entity': entity,
       'name': sw.item.str('name'),
       'accent': c['accent'],
       'on_text': c['on_text'],
@@ -142,7 +149,7 @@ class _SwitchCardState extends State<SwitchCard> {
     };
     showControlSheetBuilder(
       context,
-      (_) => sw.entity.startsWith('light.')
+      (_) => entity.startsWith('light.')
           ? LightSheet(config: config, env: widget.env)
           : SwitchSheet(config: config, env: widget.env),
     );

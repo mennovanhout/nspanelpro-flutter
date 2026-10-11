@@ -75,6 +75,28 @@ inspected but cannot be operated. A refused on/off command in a switch/input-boo
 dialog leaves it open with an error; a refused tile tap clears its optimistic echo.
 Opening and closing details never sends a service call.
 
+**Separate detail target.** Set `detail_entity` on a switch entry to open another
+entity on long-press. The original `entity` still determines short-tap commands,
+tile state and availability. The target uses the existing native dialog for its
+domain: light controls, basic on/off for switches/input booleans/fans, or a
+read-only state for other domains. This does not add further domain controls.
+
+```yaml
+type: custom:nspanel-switch-card
+switches:
+  - entity: switch.room_power
+    detail_entity: light.room
+    name: Room
+```
+
+For the single-entity shorthand, put `detail_entity` beside `entity` on the card;
+for a grid, configure it per entry in `switches`. A non-empty string is trimmed;
+missing, blank or non-string values use `entity`. An explicitly configured target
+that is unavailable or missing stays unavailable; commands never fall back to the
+original entity. `more_info: false` still disables details. No device relationship
+is inferred. The matching web-card extension opens HA more-info for the same
+target; older bundles ignore `detail_entity` and use the original entity.
+
 
 The camera card is a doorbell or a driveway as a still, asked for at the card's own size and
 replaced about once a second - and only while its page is the one showing and the
