@@ -3,6 +3,7 @@ package nl.mennovanhout.nspanel_app
 import android.content.BroadcastReceiver
 import android.content.Intent
 import android.content.IntentFilter
+import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -32,11 +33,24 @@ class MainActivity : FlutterActivity() {
     private lateinit var touchGuard: WakeTouchGuard
     private var displayEvents: EventChannel.EventSink? = null
     private var saverVisible = false
+    private var nativeIdleTimeout: Int? = null
+    private fun restoreSystemTimeout() {
+        val timeout = nativeIdleTimeout ?: return
+        if (Settings.System.canWrite(this) && Settings.System.getInt(contentResolver,
+                Settings.System.SCREEN_OFF_TIMEOUT, -1) != timeout) {
+            Settings.System.putInt(contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, timeout)
+        }
+    }
     private var foreground = true
     private var fingers = 0
     private var lastTouch: MotionEvent? = null
     private var receiverRegistered = false
     private val displayHandler = Handler(Looper.getMainLooper())
+    private val timeoutObserver = object : ContentObserver(displayHandler) {
+        override fun onChange(selfChange: Boolean) {
+            if (foreground) restoreSystemTimeout()
+        }
+    }
     private var lifecycleGeneration = 0
     private val power get() = getSystemService(Context.POWER_SERVICE) as PowerManager
 
@@ -108,6 +122,7 @@ class MainActivity : FlutterActivity() {
         super.onResume()
         lifecycleGeneration++
         foreground = true
+        restoreSystemTimeout()
         syncScreen()
         emitDisplay("lifecycle")
     }
@@ -119,6 +134,7 @@ class MainActivity : FlutterActivity() {
         // activity must keep the sensor alive; another foreground app must not.
         displayHandler.postDelayed({
             if (generation == lifecycleGeneration && power.isInteractive) {
+                restoreSystemTimeout()
                 foreground = false
                 if (::touchGuard.isInitialized && touchGuard.cancel()) cancelTouch()
                 fingers = 0
@@ -164,6 +180,8 @@ class MainActivity : FlutterActivity() {
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(displayReceiver, filter, Context.RECEIVER_EXPORTED)
         else @Suppress("DEPRECATION") registerReceiver(displayReceiver, filter)
         receiverRegistered = true
+        contentResolver.registerContentObserver(
+            Settings.System.getUriFor(Settings.System.SCREEN_OFF_TIMEOUT), false, timeoutObserver)
         // A wall panel that goes to sleep is a wall. No plugin needed for one flag.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
@@ -202,6 +220,11 @@ class MainActivity : FlutterActivity() {
             })
         MethodChannel(messenger, "nl.mennovanhout.nspanel/displayControl").setMethodCallHandler { call, result ->
             when (call.method) {
+                "idleTimeout" -> {
+                    nativeIdleTimeout = (call.arguments as? Number)?.toInt()?.coerceIn(10000, 86400000)
+                    restoreSystemTimeout()
+                    result.success(null)
+                }
                 "saver" -> {
                     val wasSaver = saverVisible
                     saverVisible = call.arguments == true
@@ -335,7 +358,10 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         lifecycleGeneration++
         displayHandler.removeCallbacksAndMessages(null)
-        if (receiverRegistered) unregisterReceiver(displayReceiver)
+        if (receiverRegistered) {
+            unregisterReceiver(displayReceiver)
+            contentResolver.unregisterContentObserver(timeoutObserver)
+        }
         displayEvents = null
         lastTouch?.recycle()
         lastTouch = null

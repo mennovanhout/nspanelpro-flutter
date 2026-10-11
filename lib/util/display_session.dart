@@ -16,6 +16,15 @@ class NativeDisplayDriver implements DisplayDriver {
     'nl.mennovanhout.nspanel/displayControl',
   );
   @override
+  Future<void> idleTimeout(int? milliseconds) async {
+    try {
+      await _control.invokeMethod<void>('idleTimeout', milliseconds);
+    } on MissingPluginException {
+      /* Non-Android host. */
+    }
+  }
+
+  @override
   Future<bool> off() => _power.off();
   @override
   Future<void> on() => _power.on();

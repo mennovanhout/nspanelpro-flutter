@@ -210,7 +210,9 @@ not add permissions, dashboard options or MQTT topics.
 
 Use exactly one display controller: disable competing custom sleep and wake modules
 in external panel tools when enabling native ownership. Keep their launcher/watchdog
-functions if needed. Preserve a finite Android screen timeout for other apps. The
+functions if needed. With the existing WRITE_SETTINGS grant, native ownership
+restores the configured idle interval as Android's fallback timeout, including
+firmware overrides during boot and handoff to another app. The
 native sleep backend still needs local ADB; if it fails, the visible screensaver
 remains and the app logs the failure instead of claiming that the backlight is off.
 

@@ -7,6 +7,12 @@ import 'package:nspanel_app/util/proximity_presence.dart';
 
 class Driver implements DisplayDriver {
   int offs = 0, ons = 0;
+  int? systemTimeout;
+  @override
+  Future<void> idleTimeout(int? milliseconds) async {
+    systemTimeout = milliseconds;
+  }
+
   bool saverOn = false, cpu = false, fail = false;
   Completer<bool>? pending;
   @override
@@ -58,6 +64,7 @@ void main() {
     touch(c, 1);
     await t.pump(const Duration(seconds: 30));
     expect(d.offs, 0);
+    expect(d.systemTimeout, 15000);
     touch(c, 2);
     touch(c, 1);
     await t.pump(const Duration(seconds: 30));
