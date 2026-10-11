@@ -221,7 +221,9 @@ class _DashboardState extends State<Dashboard> {
 
     _conn.onReady = _loadConfig;
     _conn.status.addListener(_onStatus);
-    _conn.start();
+    _states.lightMemory.load(widget.settings.url).then((_) {
+      if (mounted) _conn.start();
+    });
     _armIdle();
     // A process that starts with the display asleep - after a self-update
     // at night, or a crash - would draw the dashboard into a dark screen and
@@ -357,7 +359,11 @@ class _DashboardState extends State<Dashboard> {
 
   /// `index` is the page's place in the pager, or -1 for the warm-up's
   /// hidden copy, which must never count as on screen.
-  Widget _page(PanelPage p, {required bool animate, required int index}) => PageScope(
+  Widget _page(
+    PanelPage p, {
+    required bool animate,
+    required int index,
+  }) => PageScope(
     index: index,
     shown: _shownPage,
     awake: _awake,
@@ -513,6 +519,7 @@ class _DashboardState extends State<Dashboard> {
     _conn.status.removeListener(_onStatus);
     _unsubLovelace?.call();
     _conn.dispose();
+    _states.lightMemory.dispose();
     super.dispose();
   }
 
@@ -814,7 +821,9 @@ class _DashboardState extends State<Dashboard> {
             if (_warm)
               Warmup(
                 onDone: () => setState(() => _warm = false),
-                children: [for (final p in _pages) _page(p, animate: false, index: -1)],
+                children: [
+                  for (final p in _pages) _page(p, animate: false, index: -1),
+                ],
               ),
             if (_error != null && _pages.isNotEmpty)
               Positioned(

@@ -47,40 +47,40 @@ class LightControls {
     return Ns.amber;
   }
 
-  Future<void> call(String service, [Map<String, dynamic>? data]) async {
-    if (!capabilities.available) return;
-    await env.conn.callService('light', service, {
+  Future<bool> call(String service, [Map<String, dynamic>? data]) async {
+    if (!capabilities.available || !env.conn.isOnline) return false;
+    return env.conn.callService('light', service, {
       'entity_id': entity,
       ...?data,
     });
   }
 
-  void commit(double v) {
-    if (!capabilities.available || !capabilities.brightness) return;
+  Future<bool> commit(double v) async {
+    if (!capabilities.available || !capabilities.brightness) return false;
     final pct = (v * 100).round();
     if (pct == 0) {
-      call('turn_off');
+      return call('turn_off');
     } else {
-      call('turn_on', {'brightness_pct': pct});
+      return call('turn_on', {'brightness_pct': pct});
     }
   }
 
-  void applyPreset(CardConfig p) {
-    if (!capabilities.allowsPreset(current, p)) return;
+  Future<bool> applyPreset(CardConfig p) async {
+    if (!capabilities.allowsPreset(current, p)) return false;
     if (p['scene'] != null) {
-      env.conn.callService('scene', 'turn_on', {'entity_id': p['scene']});
-      return;
+      return env.conn.callService('scene', 'turn_on', {
+        'entity_id': p['scene'],
+      });
     }
     final pct = (p['brightness_pct'] as num?)?.toInt();
     if (pct == 0) {
-      call('turn_off');
-      return;
+      return call('turn_off');
     }
     final data = <String, dynamic>{};
     if (pct != null) data['brightness_pct'] = pct;
     for (final k in ['color_temp_kelvin', 'rgb_color', 'effect']) {
       if (p[k] != null) data[k] = p[k];
     }
-    call('turn_on', data);
+    return call('turn_on', data);
   }
 }

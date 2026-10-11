@@ -198,7 +198,7 @@ void main() {
       );
       await openTarget(t);
       expect(
-        t.widget<ControlSheet>(find.byType(ControlSheet)).enabled,
+        t.widget<ControlSheet>(find.byType(ControlSheet)).actions.last.enabled,
         isFalse,
       );
       await t.tap(find.text('Turn on'));
@@ -222,7 +222,7 @@ void main() {
       );
       await openTarget(t);
       expect(
-        t.widget<ControlSheet>(find.byType(ControlSheet)).enabled,
+        t.widget<ControlSheet>(find.byType(ControlSheet)).actions.last.enabled,
         isFalse,
       );
       states.update(
@@ -236,7 +236,10 @@ void main() {
         ),
       );
       await t.pump();
-      expect(t.widget<ControlSheet>(find.byType(ControlSheet)).enabled, isTrue);
+      expect(
+        t.widget<ControlSheet>(find.byType(ControlSheet)).actions.last.enabled,
+        isTrue,
+      );
       expect(find.text('Turn off'), findsOneWidget);
       expect(fake.calls, isEmpty);
     },

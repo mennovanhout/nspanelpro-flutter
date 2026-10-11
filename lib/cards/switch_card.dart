@@ -72,6 +72,9 @@ class _SwitchCardState extends State<SwitchCard> {
                   {
                     'entity': c['entity'],
                     'detail_entity': c['detail_entity'],
+                    'step_target': c['step_target'],
+                    'step': c['step'],
+                    'effect_favorites': c['effect_favorites'],
                     'name': c.str('title') ?? c.str('name'),
                     'icon': c['icon'],
                   },
@@ -161,6 +164,9 @@ class _SwitchCardState extends State<SwitchCard> {
       'on_text': c['on_text'],
       'off_text': c['off_text'],
       'echo_ms': c['echo_ms'],
+      'step_target': sw.item['step_target'] ?? c['step_target'],
+      'step': sw.item['step'] ?? c['step'],
+      'effect_favorites': sw.item['effect_favorites'] ?? c['effect_favorites'],
     };
     showControlSheetBuilder(
       context,
