@@ -9,6 +9,7 @@ abstract interface class DisplayDriver {
   Future<void> on();
   Future<void> holdCpu(bool on);
   Future<void> saver(bool on);
+  Future<void> idleTimeout(int? milliseconds);
 }
 
 /// One owner for the dashboard, every dialog, and the physical display.
@@ -43,6 +44,13 @@ class DisplayController extends ChangeNotifier {
         before?.sleepAfterSeconds != next?.sleepAfterSeconds ||
         before?.keepAwakeOnProximity != next?.keepAwakeOnProximity;
     config = next;
+    unawaited(
+      driver.idleTimeout(
+        active && next != null
+            ? next.afterSeconds.clamp(10, 86400) * 1000
+            : null,
+      ),
+    );
     final wasEnabled = enabled;
     enabled = active;
     if (active && !wasEnabled && !interactive && next?.sleep == true) {
