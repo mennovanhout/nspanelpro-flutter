@@ -61,6 +61,45 @@ The switch card is the button card's sibling for switches, input booleans and fa
 is lit while its entity is on, and a tap turns it the other way, echoed at once for
 `echo_ms` so the tile never shows the old state under a finger.
 
+Hold a switch tile to open native details (`more_info: true`, the default); set
+`more_info: false` to disable details. Releasing a hold never also toggles the entity,
+and horizontal swipes still belong to the pager. Light entities use the same
+capability-aware dialog as light cards: relay lights have only on/off; dimmable lights
+keep brightness controls while off. Switches, input booleans and fans initially offer
+on/off only. Other domains show their reported state without guessing device controls.
+These are small native dialogs, not the full Home Assistant web more-info frontend;
+fan speed and a free color picker are not implemented here.
+
+Details follow live HA changes. Missing, unknown or unavailable entities can be
+inspected but cannot be operated. A refused on/off command in a switch/input-boolean/fan
+dialog leaves it open with an error; a refused tile tap clears its optimistic echo.
+Opening and closing details never sends a service call.
+
+**Separate detail target.** Set `detail_entity` on a switch entry to open another
+entity on long-press. The original `entity` still determines short-tap commands,
+tile state and availability. The target uses the existing native dialog for its
+domain: light controls, basic on/off for switches/input booleans/fans, or a
+read-only state for other domains. This does not add further domain controls.
+
+```yaml
+type: custom:nspanel-switch-card
+switches:
+  - entity: switch.room_power
+    detail_entity: light.room
+    name: Room
+```
+
+For the single-entity shorthand, put `detail_entity` beside `entity` on the card;
+for a grid, configure it per entry in `switches`. A non-empty string is trimmed;
+missing, blank or non-string values use `entity`. An explicitly configured target
+that is unavailable or missing stays unavailable; commands never fall back to the
+original entity. `more_info: false` still disables details. No device relationship
+is inferred. Dashboard edits replace cached tile bindings, including detail targets,
+without restarting the app. Pending tap feedback from the previous configuration
+is discarded. The matching web-card extension opens HA more-info for the same
+target; older bundles ignore `detail_entity` and use the original entity.
+
+
 The camera card is a doorbell or a driveway as a still, asked for at the card's own size and
 replaced about once a second - and only while its page is the one showing and the
 screensaver is not up, so a camera on its own page costs nothing the rest of the time. No
@@ -75,6 +114,25 @@ opens one full screen, and a refused code says so and clears. It rings the built
 `vertical-stack`, `horizontal-stack` and `grid` are rendered as layout, nested as deep as you
 like. In a horizontal stack every child is an equal column and keeps its own `height`, so give
 them the same one. `grid` takes `columns`; `square` is ignored.
+
+## On/off light cards
+
+The light card follows HA's `supported_color_modes`, matching the web renderer. Relay
+lights show state without percentages, dimming gestures or default brightness presets.
+Long-press opens an on/off dialog; `long_press: none` disables it. Dimmable lights keep their
+controls while off even when HA omits their current brightness. Missing, empty or
+unrecognized modes fall back to on/off, and an active `color_mode: onoff` effect temporarily
+restricts brightness and color adjustments.
+
+Explicit unsupported presets remain visible but disabled. Scenes and the explicit
+`brightness_pct: 0` off preset remain available; effect presets require HA's effect
+capability and an entry in `effect_list`. The dialog follows live state and capability
+changes and disables actions when the entity becomes unavailable. Opening or closing it
+never sends a command, nor does cancelling a drag. There is no new configuration option.
+
+Run `flutter test test/light_capabilities_test.dart test/light_widget_test.dart` for the
+capability and interaction regressions. `test/fixtures/light-capabilities.json` mirrors the
+web cards' fixtures. Changes to the shared sheet must also pass the complete widget suite.
 
 ## Screensaver
 
@@ -120,6 +178,47 @@ value otherwise, so the entity always tells you what the panel is doing. **Use d
 settings** drops the overrides. Nothing has to be typed on the wall and nothing goes through
 adb; the only thing the setup screen (two-finger hold) still needs is the MQTT broker itself,
 which has to exist before Home Assistant can see the device.
+
+**Display ownership and input safety.** The native app observes touches before Flutter,
+including touches in detail dialogs. Automatic sleep waits until every finger is up
+and then starts the full idle interval. A stationary finger counts as activity. Setup
+is exempt; when another app is foreground, Android/that app owns the display. The
+screensaver is above all app dialogs and waking preserves the page and open dialog.
+
+For direct display-off after 15 seconds, use `after: 15`, `sleep: true`, and
+`sleep_after: 0`. The existing MQTT/HA **Sleep after** setting can later add a visible
+screensaver interval; changing it does not wake a display that is already dark.
+Turning **Sleep** off while dark reveals the screensaver. Neither telemetry nor HA
+state updates reset the idle timer. Configuration overrides keep their usual precedence.
+
+The native-only option `keep_awake_on_proximity: true` (default false) also inhibits
+idle while the sensor detects proximity. Use `proximity_above` or `proximity_below`
+for a calibrated absolute threshold; otherwise a resting baseline is learned.
+Entry requires two readings; release uses 20% hysteresis and 500 ms debounce.
+Unchanging sensor values do not expire. A hand held near the panel is not learned
+as the new baseline. This is short-range proximity, not room occupancy sensing.
+A forced screensaver command suppresses an already-present hand until it leaves
+and approaches again. Touch and an explicit wake command can still wake immediately.
+
+Every physical screen wake starts a fixed 500 ms touch guard, including proximity,
+remote wake and a cold app start with the screen lit. A gesture begun during the
+guard is swallowed through its final release, including extra fingers and long
+presses. A new gesture at 500 ms can operate normally; no extra first tap is required.
+Waking a visible screensaver similarly consumes its wake gesture. A screen-off event
+cancels a forwarded gesture rather than committing its slider value. The guard does
+not add permissions, dashboard options or MQTT topics.
+
+Use exactly one display controller: disable competing custom sleep and wake modules
+in external panel tools when enabling native ownership. Keep their launcher/watchdog
+functions if needed. With the existing WRITE_SETTINGS grant, native ownership
+restores the configured idle interval as Android's fallback timeout, including
+firmware overrides during boot and handoff to another app. While the configured
+dashboard owns an awake display, a native display wake lock prevents Android's
+timeout from bypassing gesture and proximity activity. It does not wake the screen
+and is released on screen-off, app handoff, disabled ownership or destruction;
+this also covers panel firmware that drops the window's keep-screen-on lock after wake. The
+native sleep backend still needs local ADB; if it fails, the visible screensaver
+remains and the app logs the failure instead of claiming that the backlight is off.
 
 **Auto brightness.** The same device page has **Auto brightness** with a minimum, a maximum
 and a daylight point: at 0 lx the screen sits at the minimum, at the daylight point (500 lx by
@@ -441,3 +540,192 @@ lib/util/        colour clamp, icon lookup, number formatting, the panel's senso
 assets/sounds/   the built-in sounds, generated by tool/sounds.py together with lib/audio/sounds.dart
 test/            colour, config parsing, the HA protocol and MQTT against fakes
 ```
+
+
+## Native UI conventions
+
+See [UI guidelines](UI-GUIDELINES.md) for shared layout, colour roles and touch geometry.
+
+## Light colour controls
+
+Long-press a light card or a switch tile whose `detail_entity` is a light to open
+its shared light dialog. Dimmable, tunable-white and colour lights use the same
+layout: tall unlabelled tracks, brightness on the right, then large +/− buttons.
+Horizontal shadow markers show positions. Only brightness shows a percentage; temperature
+and hue/saturation remain available to accessibility tools without visible scales.
+The brightness fill previews the target colour. Card and action accents continue
+to follow `accent` / `follow_color`.
+
+```yaml
+type: custom:nspanel-light-card
+entity: light.wled
+step_target: last_used  # brightness (default) or last_used
+step: 5
+effect_favorites:
+  - effect: Solid
+    name: Static
+    icon: mdi:lightbulb-outline
+  - effect: Rainbow
+    name: Rainbow
+```
+
+`step_target: brightness` always adjusts brightness. With `last_used`, +/− starts
+with brightness each time the dialog opens, then follows the last completed
+slider interaction. Its thicker position marker identifies that slider. Cancelled
+gestures and external HA updates do not select a target. Returning from presets
+or effects preserves it; changing colour mode or losing a capability resets to
+brightness. `step` is a percentage of the channel range (default 5: brightness /
+saturation 5 points, hue 18 degrees, temperature 5% of its Kelvin range). Hue wraps.
+
+Both fields and `effect_favorites` also work on switch cards and individual switch
+items; an item overrides its card. `detail_entity` selects the light for details
+while short taps still operate `entity`. The web editors expose these options.
+
+Effects open a separate scrollable two-column chooser in configured order.
+`effect` must exactly match an HA `effect_list` entry; `name` and `icon` are
+optional. Unsupported favourites stay visible but disabled; the current effect
+has a check mark. Without favourites there is no Effects action. Existing presets
+and scenes remain available on their own subpage. Back and Close never send a
+command. Successful power, preset and effect commands close the dialog.
+
+HA capabilities determine which tracks appear. Temperature requires valid Kelvin
+bounds (legacy mired bounds are converted); absent/invalid bounds hide that track.
+RGB, RGBW, RGBWW, HS and XY lights accept `hs_color` through HA's conversion;
+RGBWW may also expose temperature with valid bounds. An active brightness-only
+effect temporarily hides colour tracks. Merely opening or changing UI mode never
+changes the light. Off lights retain supported controls.
+
+Dragging previews locally and releasing sends one command with the changed
+property only: `brightness_pct`, `color_temp_kelvin` or `hs_color`. Zero brightness
+sends `light.turn_off`. Colour and effects can turn an off light on without sending
+zero brightness. Pending requests lock device controls; rejection or a 10-second
+timeout restores confirmed state and leaves an error visible, without automatic
+retry. A timeout cannot prove whether the device eventually applied the command.
+
+Contract reference: [HA light entity](https://developers.home-assistant.io/docs/core/entity/light/)
+and [light actions](https://www.home-assistant.io/integrations/light/).
+
+### Last confirmed light values
+
+Light details remember confirmed on-state brightness, colour mode, HS/RGB colour,
+colour temperature and effect locally. When a light is off, valid HA attributes
+take precedence and missing values fall back to this memory. The status reads
+`Off · last values`; dashboard tiles still show the actual off state. Unavailable
+entities and capabilities always come from live HA state. The remembered effect
+can be selected again while off to turn the light on. The plain power action
+still sends only `turn_on`; it never reapplies a saved snapshot.
+
+The cache is scoped to the HA origin, limited to 128 lights and survives restarts.
+Only confirmed HA on-state messages update it; drafts, service acknowledgements,
+failed commands and zero/null off attributes do not. Writes are batched for two
+seconds and flushed when an off update arrives. Storage failure falls back to
+session memory. Each client remembers what it has observed itself; changes while
+it was absent cannot be recovered from missing off attributes. No history API,
+background polling, new dependency or HA helper is required.
+
+### Native preview
+
+Actual 480×480 panel captures using simulated lights.
+
+| Dimmer | Tunable white | RGB / last-used slider |
+| --- | --- | --- |
+| ![Dimmer with a 50% brightness fill](docs/images/light-controls/dimmer.png) | ![Tunable-white gradient and matching brightness fill](docs/images/light-controls/tw.png) | ![RGB sliders with hue selected for plus/minus](docs/images/light-controls/rgb.png) |
+
+| Effect favourites | Last values while off |
+| --- | --- |
+| ![Remembered Rainbow effect selected while off](docs/images/light-controls/effects.png) | ![RGB details showing Off · last values after restarting the app](docs/images/light-controls/last-values.png) |
+
+[Capture notes](docs/images/light-controls/README.md).
+
+
+## Local page navigation and idle return
+
+Buttons can navigate without an entity or a Home Assistant service. Indices are
+zero-based, like `start` and the native MQTT page command:
+
+```yaml
+type: custom:nspanel-button-card
+height: 120
+columns: 3
+haptics: false
+buttons:
+  - name: Lights
+    icon: mdi:lightbulb-group
+    tap_action:
+      action: navigate-page
+      page: 1
+  - name: Covers
+    icon: mdi:window-shutter
+    tap_action:
+      action: navigate-page
+      page: 3
+  - name: Climate
+    icon: mdi:thermostat
+    tap_action:
+      action: navigate-page
+      page: 4
+```
+
+An explicit `tap_action` takes precedence over `entity` and `service`, including
+when invalid: it never falls through to a device command. Only `navigate-page`
+is supported here. `page` must be a nonnegative integer naming an existing page.
+Invalid targets do nothing; unlike the old native MQTT path they are not clamped.
+Repeated commands work after a manual swipe. Existing service/entity buttons
+retain their behavior. Local navigation needs no HA/MQTT connection; native
+page telemetry still reports the page when MQTT is connected.
+
+Configure automatic return on the swipe container:
+
+```yaml
+type: custom:nspanel-swipe-card
+start: 2
+return_to_start_after: 15
+return_to_start_overrides:
+  - page: 5
+    after: 60
+# cards: your existing page list
+```
+
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `return_to_start_after` | `0` | Nonnegative integer seconds of inactivity. Zero disables the entire feature. |
+| `return_to_start_overrides` | `[]` | Objects with integer `page` and `after`; an override replaces the standard duration on that page. |
+
+With return enabled, `after: 0` disables return on that individual page. Invalid
+entries are ignored; the last valid entry for a repeated index wins. An index
+outside the current page count has no effect. These are general page options:
+there is no camera/entity-specific behavior or display wake lock.
+
+Page entry, an explicit page command, and interaction renew the interval. A held
+finger, including multiple fingers, blocks return; the full interval starts after
+the gesture and swipe settling end. HA updates, camera frames, proximity and
+MQTT telemetry do not count as activity. At expiry, owned NSPanel detail sheets
+and code dialogs close without submitting or committing values, then the start
+page is shown. A sheet on the start page closes too. Already submitted commands
+are not retried. Explicit page commands received during a gesture wait for it to
+end; the latest valid command wins.
+
+Elapsed background/sleep time counts. An overdue return is performed on resume
+without waking the display or stealing focus from another app. Setup is excluded.
+In the browser, HA's own more-info/editor dialogs are an external context: return
+is suspended there and starts a fresh interval after closing. A hidden tab does
+not animate; an overdue return is applied when shown again. Display sleep and
+proximity wake remain separately configured, even on pages with longer intervals.
+
+In the browser each `custom:nspanel-swipe-card` owns its navigation and dialogs;
+nested card events cross shadow roots but cannot move another instance. These
+new web features are not provided by third-party `simple-swipe-card`. The native
+app continues to read existing swipe-card layouts and uses its displayed page
+indices (also used by MQTT); its existing first swipe-container options govern
+its single native pager. Keep the recommended single panel view/container for
+identical page numbering in both renderers. Both new options and nested button
+actions survive the visual editor.
+
+### Navigation example on the panel
+
+Actual 480×480 panel captures with simulated entities. The demonstration uses a
+3-second idle interval to make the return visible; the default remains disabled.
+
+| Local command to page 1 | Idle return to start page 2 |
+| --- | --- |
+| ![Local navigation to page 1](docs/images/navigation/page-1.png) | ![Automatic return to start page 2](docs/images/navigation/idle-home.png) |

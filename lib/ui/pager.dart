@@ -1,3 +1,5 @@
+import '../util/navigation_controller.dart';
+
 import 'package:flutter/material.dart';
 
 import 'theme.dart';
@@ -20,8 +22,8 @@ class PanelPager extends StatefulWidget {
   final bool showDots;
   final int initialPage;
 
-  /// Set a page index here and the pager goes there - how HA turns the page.
-  final ValueNotifier<int>? jump;
+  /// Imperative dashboard navigation; repeated target commands are preserved.
+  final PanelNavigation? jump;
   final ValueChanged<int>? onPage;
 
   @override
@@ -39,11 +41,26 @@ class _PanelPagerState extends State<PanelPager> {
   void initState() {
     super.initState();
     widget.jump?.addListener(_onJump);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _onJump();
+    });
     if (_index != 0) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => widget.onPage?.call(_index),
       );
     }
+  }
+
+  @override
+  void didUpdateWidget(PanelPager oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.jump != widget.jump) {
+      oldWidget.jump?.removeListener(_onJump);
+      widget.jump?.addListener(_onJump);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _onJump();
+    });
   }
 
   @override
@@ -53,14 +70,38 @@ class _PanelPagerState extends State<PanelPager> {
     super.dispose();
   }
 
+  bool _programmatic = false;
+  int _motion = 0;
   void _onJump() {
-    final i = widget.jump!.value.clamp(0, widget.pages.length - 1);
-    if (!_controller.hasClients || i == _index) return;
-    _controller.animateToPage(
-      i,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-    );
+    final nav = widget.jump;
+    final i = nav?.target;
+    if (i == null || i < 0 || i >= widget.pages.length) return;
+    if (!_controller.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _onJump();
+      });
+      return;
+    }
+    if (i == _index && (_controller.page ?? i.toDouble()) == i) {
+      nav!.shown(i);
+      return;
+    }
+    final motion = ++_motion;
+    _programmatic = true;
+    if (!nav!.animate) {
+      _controller.jumpToPage(i);
+      _programmatic = false;
+    } else {
+      _controller
+          .animateToPage(
+            i,
+            duration: const Duration(milliseconds: 350),
+            curve: Curves.easeOutCubic,
+          )
+          .whenComplete(() {
+            if (mounted && motion == _motion) _programmatic = false;
+          });
+    }
   }
 
   @override
@@ -68,24 +109,37 @@ class _PanelPagerState extends State<PanelPager> {
     final many = widget.pages.length > 1 && widget.showDots;
     return Stack(
       children: [
-        PageView.builder(
-          controller: _controller,
-          // the neighbouring pages are built while this one is shown, not
-          // in the middle of the swipe that reveals them
-          allowImplicitScrolling: true,
-          itemCount: widget.pages.length,
-          onPageChanged: (i) {
-            setState(() => _index = i);
-            widget.onPage?.call(i);
+        NotificationListener<ScrollNotification>(
+          onNotification: (event) {
+            if (event.depth != 0) return false;
+            if (event is ScrollStartNotification) {
+              if (event.dragDetails != null) _programmatic = false;
+              widget.jump?.scroll(true, user: !_programmatic);
+            } else if (event is ScrollEndNotification) {
+              widget.jump?.scroll(false, user: !_programmatic);
+            }
+            return false;
           },
-          itemBuilder: (_, i) => Padding(
-            padding: EdgeInsets.fromLTRB(
-              Ns.gap,
-              Ns.gap,
-              Ns.gap,
-              many ? 26 : Ns.gap,
+          child: PageView.builder(
+            controller: _controller,
+            // the neighbouring pages are built while this one is shown, not
+            // in the middle of the swipe that reveals them
+            allowImplicitScrolling: true,
+            itemCount: widget.pages.length,
+            onPageChanged: (i) {
+              setState(() => _index = i);
+              widget.jump?.shown(i);
+              widget.onPage?.call(i);
+            },
+            itemBuilder: (_, i) => Padding(
+              padding: EdgeInsets.fromLTRB(
+                Ns.gap,
+                Ns.gap,
+                Ns.gap,
+                many ? 26 : Ns.gap,
+              ),
+              child: widget.pages[i],
             ),
-            child: widget.pages[i],
           ),
         ),
         if (many)
