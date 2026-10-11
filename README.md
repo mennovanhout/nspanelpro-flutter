@@ -154,7 +154,11 @@ Use exactly one display controller: disable competing custom sleep and wake modu
 in external panel tools when enabling native ownership. Keep their launcher/watchdog
 functions if needed. With the existing WRITE_SETTINGS grant, native ownership
 restores the configured idle interval as Android's fallback timeout, including
-firmware overrides during boot and handoff to another app. The
+firmware overrides during boot and handoff to another app. While the configured
+dashboard owns an awake display, a native display wake lock prevents Android's
+timeout from bypassing gesture and proximity activity. It does not wake the screen
+and is released on screen-off, app handoff, disabled ownership or destruction;
+this also covers panel firmware that drops the window's keep-screen-on lock after wake. The
 native sleep backend still needs local ADB; if it fails, the visible screensaver
 remains and the app logs the failure instead of claiming that the backlight is off.
 

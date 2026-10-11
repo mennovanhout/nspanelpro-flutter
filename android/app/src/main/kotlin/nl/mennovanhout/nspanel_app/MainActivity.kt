@@ -34,6 +34,26 @@ class MainActivity : FlutterActivity() {
     private var displayEvents: EventChannel.EventSink? = null
     private var saverVisible = false
     private var nativeIdleTimeout: Int? = null
+    private var displayLock: PowerManager.WakeLock? = null
+    private val awakeHold = DisplayAwakeHold(
+        acquire = {
+            // NSPanel firmware can drop WindowManager's KEEP_SCREEN_ON lock
+            // after waking. Hold our own while the app owns the awake display.
+            // No ACQUIRE_CAUSES_WAKEUP: sleep events must remain authoritative.
+            @Suppress("DEPRECATION")
+            val lock = power.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                PowerManager.ON_AFTER_RELEASE, "nspanel:display")
+            lock.setReferenceCounted(false)
+            lock.acquire()
+            displayLock = lock
+        },
+        release = {
+            displayLock?.let { if (it.isHeld) it.release() }
+            displayLock = null
+        })
+    private fun updateAwakeHold() {
+        awakeHold.update(nativeIdleTimeout != null, foreground, power.isInteractive)
+    }
     private fun restoreSystemTimeout() {
         val timeout = nativeIdleTimeout ?: return
         if (Settings.System.canWrite(this) && Settings.System.getInt(contentResolver,
@@ -72,6 +92,7 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun syncScreen() {
+        updateAwakeHold()
         if (!::touchGuard.isInitialized) return
         val on = power.isInteractive
         val wentOff = touchGuard.interactive && !on
@@ -136,6 +157,7 @@ class MainActivity : FlutterActivity() {
             if (generation == lifecycleGeneration && power.isInteractive) {
                 restoreSystemTimeout()
                 foreground = false
+                updateAwakeHold()
                 if (::touchGuard.isInitialized && touchGuard.cancel()) cancelTouch()
                 fingers = 0
                 emitDisplay("lifecycle")
@@ -223,6 +245,7 @@ class MainActivity : FlutterActivity() {
                 "idleTimeout" -> {
                     nativeIdleTimeout = (call.arguments as? Number)?.toInt()?.coerceIn(10000, 86400000)
                     restoreSystemTimeout()
+                    updateAwakeHold()
                     result.success(null)
                 }
                 "saver" -> {
@@ -356,6 +379,7 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        awakeHold.update(false, false, false)
         lifecycleGeneration++
         displayHandler.removeCallbacksAndMessages(null)
         if (receiverRegistered) {
