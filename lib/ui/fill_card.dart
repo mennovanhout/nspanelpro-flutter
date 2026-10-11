@@ -42,6 +42,7 @@ class FillCard extends StatefulWidget {
     this.onLongPress,
     this.onDragValue,
     this.onDragEnd,
+    this.onDragCancel,
   });
 
   final double height;
@@ -63,6 +64,7 @@ class FillCard extends StatefulWidget {
   final VoidCallback? onLongPress;
   final ValueChanged<double>? onDragValue;
   final ValueChanged<double>? onDragEnd;
+  final VoidCallback? onDragCancel;
 
   @override
   State<FillCard> createState() => _FillCardState();
@@ -70,6 +72,7 @@ class FillCard extends StatefulWidget {
 
 class _FillCardState extends State<FillCard> {
   bool _dragging = false;
+  bool _cancelled = false;
   double _start = 0;
   double _dy = 0;
   double _last = 0;
@@ -94,13 +97,20 @@ class _FillCardState extends State<FillCard> {
 
   void _onDragEnd(DragEndDetails d) {
     _dragging = false;
-    HapticFeedback.lightImpact();
-    widget.onDragEnd?.call(_last);
+    // Flutter ends an accepted drag even for PointerCancelEvent. Only a
+    // released pointer may commit a value to the user's device.
+    if (_cancelled) {
+      widget.onDragCancel?.call();
+    } else {
+      HapticFeedback.lightImpact();
+      widget.onDragEnd?.call(_last);
+    }
     setState(() {});
   }
 
   void _onDragCancel() {
     _dragging = false;
+    widget.onDragCancel?.call();
     setState(() {});
   }
 
@@ -109,7 +119,10 @@ class _FillCardState extends State<FillCard> {
     final stops = tintStops(widget.accent);
     final canDrag = _interactive && widget.onDragValue != null;
 
-    return GestureDetector(
+    return Listener(
+      onPointerDown: (_) { _cancelled = false; },
+      onPointerCancel: (_) { _cancelled = true; },
+      child: GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: _interactive && widget.onTap != null
           ? () {
@@ -199,6 +212,7 @@ class _FillCardState extends State<FillCard> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -329,7 +343,7 @@ class _Chip extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: spec.disabled
-            ? null
+            ? () {} // Claim the tap so it cannot toggle the card underneath.
             : () {
                 HapticFeedback.lightImpact();
                 spec.onTap();

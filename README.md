@@ -76,6 +76,25 @@ opens one full screen, and a refused code says so and clears. It rings the built
 like. In a horizontal stack every child is an equal column and keeps its own `height`, so give
 them the same one. `grid` takes `columns`; `square` is ignored.
 
+## On/off light cards
+
+The light card follows HA's `supported_color_modes`, matching the web renderer. Relay
+lights show state without percentages, dimming gestures or default brightness presets.
+Long-press opens an on/off dialog; `long_press: none` disables it. Dimmable lights keep their
+controls while off even when HA omits their current brightness. Missing, empty or
+unrecognized modes fall back to on/off, and an active `color_mode: onoff` effect temporarily
+restricts brightness and color adjustments.
+
+Explicit unsupported presets remain visible but disabled. Scenes and the explicit
+`brightness_pct: 0` off preset remain available; effect presets require HA's effect
+capability and an entry in `effect_list`. The dialog follows live state and capability
+changes and disables actions when the entity becomes unavailable. Opening or closing it
+never sends a command, nor does cancelling a drag. There is no new configuration option.
+
+Run `flutter test test/light_capabilities_test.dart test/light_widget_test.dart` for the
+capability and interaction regressions. `test/fixtures/light-capabilities.json` mirrors the
+web cards' fixtures. Changes to the shared sheet must also pass the complete widget suite.
+
 ## Screensaver
 
 After a period without a touch the panel shows a photo and a clock that wanders so nothing
