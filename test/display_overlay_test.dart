@@ -8,6 +8,31 @@ import 'package:nspanel_app/util/display_controller.dart';
 import 'display_controller_test.dart' show Driver;
 
 void main() {
+  testWidgets('direct sleep hides the dashboard without flashing a clock', (
+    t,
+  ) async {
+    final c = DisplayController(Driver())
+      ..configure(
+        const ScreensaverConfig(
+          afterSeconds: 15,
+          sleep: true,
+          sleepAfterSeconds: 0,
+        ),
+        active: true,
+      );
+    await t.pumpWidget(
+      MaterialApp(
+        home: DisplayOverlay(controller: c, child: const Text('Dashboard')),
+      ),
+    );
+    c.sleep(force: true);
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 1));
+    expect(find.byType(Screensaver), findsNothing);
+    expect(find.byType(ColoredBox), findsWidgets);
+    await t.pumpWidget(const SizedBox());
+    c.dispose();
+  });
   testWidgets(
     'screensaver covers modal routes and wake does not press underlying action',
     (t) async {
