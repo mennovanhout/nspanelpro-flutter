@@ -363,7 +363,7 @@ class _LightSheetState extends State<LightSheet> {
         SheetAction(
           label: on ? 'Turn off' : 'Turn on',
           icon: Icons.power_settings_new,
-          primary: true,
+          primary: on,
           close: false,
           enabled: available && !_busy && _drag == null,
           dimWhenDisabled: !available,

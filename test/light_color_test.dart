@@ -197,7 +197,8 @@ void main() {
         ),
       );
       await t.pumpAndSettle();
-      expect(powerColor('Turn on'), onColor);
+      expect(powerColor('Turn on'), Ns.surface);
+      expect(t.widget<Text>(find.text('Turn on')).style?.color, Ns.text);
       expect(find.text('Off · last values'), findsOneWidget);
       expect(slider(t, 'brightness').value, 128 / 255);
       expect(slider(t, 'hue').value, .5);
@@ -223,7 +224,7 @@ void main() {
   );
 
   testWidgets(
-    'power tint follows remembered TW and respects accent overrides',
+    'power uses on-state TW tint and neutral off action despite remembered values',
     (t) async {
       final (f, states) = await mount(t);
       Color powerColor() => t
@@ -270,9 +271,9 @@ void main() {
         ),
       );
       await t.pumpAndSettle();
-      expect(powerColor(), warm);
-      expect(powerColor(), isNot(Ns.amber));
-      expect(powerColor().r, greaterThan(powerColor().b));
+      expect(warm, isNot(Ns.amber));
+      expect(warm.r, greaterThan(warm.b));
+      expect(powerColor(), Ns.surface);
       expect(f.calls, isEmpty);
     },
   );
@@ -282,10 +283,10 @@ void main() {
     {'follow_color': false},
   ]) {
     testWidgets('power preview respects $config', (t) async {
-      await mount(t, config: config, state: 'off');
+      final (_, states) = await mount(t, config: config);
       final button = t.widget<SheetButton>(
         find.ancestor(
-          of: find.text('Turn on'),
+          of: find.text('Turn off'),
           matching: find.byType(SheetButton),
         ),
       );
@@ -293,6 +294,18 @@ void main() {
         button.color,
         config.containsKey('accent') ? const Color(0xff12abcd) : Ns.amber,
       );
+      states.update(
+        'light.test',
+        HaState(entityId: 'light.test', state: 'off', attributes: attrs),
+      );
+      await t.pumpAndSettle();
+      final off = t.widget<SheetButton>(
+        find.ancestor(
+          of: find.text('Turn on'),
+          matching: find.byType(SheetButton),
+        ),
+      );
+      expect(off.color, Ns.surface);
     });
   }
 
