@@ -20,10 +20,18 @@ class DisplayOverlay extends StatelessWidget {
         child,
         if (controller.enabled && controller.saving)
           Positioned.fill(
-            child: Screensaver(
-              config: controller.effective,
-              onWake: controller.wake,
-            ),
+            child:
+                controller.effective.sleep &&
+                    controller.effective.sleepAfterSeconds == 0
+                ? Listener(
+                    behavior: HitTestBehavior.opaque,
+                    onPointerDown: (_) => controller.wake(),
+                    child: const ColoredBox(color: Color(0xff000000)),
+                  )
+                : Screensaver(
+                    config: controller.effective,
+                    onWake: controller.wake,
+                  ),
           ),
       ],
     ),
