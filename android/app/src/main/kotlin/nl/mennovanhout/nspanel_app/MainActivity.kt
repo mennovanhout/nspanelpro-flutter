@@ -59,7 +59,14 @@ class MainActivity : FlutterActivity() {
 
     private fun syncScreen() {
         if (!::touchGuard.isInitialized) return
-        if (touchGuard.screen(power.isInteractive)) cancelTouch()
+        val on = power.isInteractive
+        val wentOff = touchGuard.interactive && !on
+        if (touchGuard.screen(on)) cancelTouch()
+        else if (wentOff) {
+            fingers = 0
+            lastTouch?.recycle()
+            lastTouch = null
+        }
     }
 
     private val displayReceiver = object : BroadcastReceiver() {
@@ -196,7 +203,11 @@ class MainActivity : FlutterActivity() {
         MethodChannel(messenger, "nl.mennovanhout.nspanel/displayControl").setMethodCallHandler { call, result ->
             when (call.method) {
                 "saver" -> {
+                    val wasSaver = saverVisible
                     saverVisible = call.arguments == true
+                    if (wasSaver && !saverVisible && ::touchGuard.isInitialized && power.isInteractive) {
+                        touchGuard.protect()
+                    }
                     if (saverVisible && ::touchGuard.isInitialized && touchGuard.cancel()) {
                         cancelTouch()
                         emitDisplay("snapshot")
