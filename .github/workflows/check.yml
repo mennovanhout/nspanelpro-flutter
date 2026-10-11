@@ -28,7 +28,7 @@ jobs:
 
       # The panel is arm64; one APK is all it needs, and one is all we keep.
       - run: flutter build apk --release --split-per-abi
-      - run: cd android && ./gradlew testDebugUnitTest
+      - run: cd android && ./gradlew :app:testDebugUnitTest
       - uses: actions/upload-artifact@v4
         with:
           name: nspanel-app-arm64
