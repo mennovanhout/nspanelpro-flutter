@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
@@ -60,7 +61,7 @@ class _Sw {
 
 class _SwitchCardState extends State<SwitchCard> {
   CardConfig get c => widget.config;
-  late final List<_Sw> _sws = _items().map(_Sw.new).toList();
+  late List<_Sw> _sws = _items().map(_Sw.new).toList();
   final _timers = <Timer>[];
 
   List<CardConfig> _items() {
@@ -85,6 +86,20 @@ class _SwitchCardState extends State<SwitchCard> {
           it.cast<String, dynamic>(),
     ];
     return list.where((i) => i['entity'] != null).take(6).toList();
+  }
+
+  @override
+  void didUpdateWidget(covariant SwitchCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!mapEquals(oldWidget.config, widget.config)) {
+      // HA replaces the cached dashboard after connecting or saving an edit.
+      // Drop old tile bindings and their echo; pending results belong to them.
+      for (final timer in _timers) {
+        timer.cancel();
+      }
+      _timers.clear();
+      _sws = _items().map(_Sw.new).toList();
+    }
   }
 
   int get _columns {

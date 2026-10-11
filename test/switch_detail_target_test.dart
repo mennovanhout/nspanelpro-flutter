@@ -82,6 +82,70 @@ Future<void> closeTarget(WidgetTester t) async {
 }
 
 void main() {
+  testWidgets('HA config replaces cached detail bindings without restart', (
+    t,
+  ) async {
+    final config = ValueNotifier<Map<String, dynamic>>({});
+    addTearDown(config.dispose);
+    final (fake, _) = await mountTarget(
+      t,
+      updates: config,
+      targets: {
+        'light.detail': st('light.detail', 'off', {
+          'supported_color_modes': ['onoff'],
+        }),
+      },
+    );
+    await openTarget(t);
+    expect(find.byType(LightSheet), findsNothing);
+    await closeTarget(t);
+    config.value = {
+      'switches': [
+        {'entity': 'switch.primary', 'detail_entity': 'light.detail'},
+      ],
+    };
+    await t.pump();
+    await openTarget(t);
+    expect(find.byType(LightSheet), findsOneWidget);
+    await closeTarget(t);
+    config.value = {'entity': 'switch.primary'};
+    await t.pump();
+    await openTarget(t);
+    expect(find.byType(LightSheet), findsNothing);
+    expect(fake.calls, isEmpty);
+  });
+
+  testWidgets('updated tile entity replaces old handlers and pending echo', (
+    t,
+  ) async {
+    final config = ValueNotifier<Map<String, dynamic>>({});
+    addTearDown(config.dispose);
+    final (fake, _) = await mountTarget(
+      t,
+      updates: config,
+      targets: {
+        'input_boolean.secondary': st('input_boolean.secondary', 'off', {
+          'friendly_name': 'Secondary',
+        }),
+      },
+    );
+    await t.tap(find.text('Primary'));
+    await t.pump();
+    expect(find.text('On'), findsOneWidget);
+    config.value = {'entity': 'input_boolean.secondary'};
+    await t.pump();
+    expect(find.text('Primary'), findsNothing);
+    expect(find.text('Off'), findsOneWidget);
+    await t.tap(find.text('Secondary'));
+    await t.pump();
+    expect(fake.calls, [
+      'homeassistant.turn_on {"entity_id":"switch.primary"}',
+      'homeassistant.turn_on {"entity_id":"input_boolean.secondary"}',
+    ]);
+    await t.pump(const Duration(seconds: 2));
+    expect(t.takeException(), isNull);
+  });
+
   for (final grid in [false, true]) {
     testWidgets(
       'detail target selects light dialog, tap keeps primary (grid=$grid)',

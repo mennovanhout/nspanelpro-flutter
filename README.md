@@ -94,7 +94,9 @@ for a grid, configure it per entry in `switches`. A non-empty string is trimmed;
 missing, blank or non-string values use `entity`. An explicitly configured target
 that is unavailable or missing stays unavailable; commands never fall back to the
 original entity. `more_info: false` still disables details. No device relationship
-is inferred. The matching web-card extension opens HA more-info for the same
+is inferred. Dashboard edits replace cached tile bindings, including detail targets,
+without restarting the app. Pending tap feedback from the previous configuration
+is discarded. The matching web-card extension opens HA more-info for the same
 target; older bundles ignore `detail_entity` and use the original entity.
 
 
