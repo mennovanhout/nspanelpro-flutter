@@ -5,10 +5,18 @@ import '../util/color.dart';
 import 'theme.dart';
 
 class SheetAction {
-  const SheetAction({required this.label, this.icon, this.primary = false, this.close = true, required this.run});
+  const SheetAction({
+    required this.label,
+    this.icon,
+    this.primary = false,
+    this.close = true,
+    this.enabled = true,
+    required this.run,
+  });
   final String label;
   final IconData? icon;
   final bool primary;
+  final bool enabled;
   final bool close;
   final VoidCallback run;
 }
@@ -28,14 +36,9 @@ Future<void> showControlSheet(
   ValueChanged<double>? onInput,
   ValueChanged<double>? onCommit,
 }) {
-  return showGeneralDialog<void>(
-    context: context,
-    barrierDismissible: true,
-    barrierLabel: 'close',
-    barrierColor: Ns.ground.withValues(alpha: .72),
-    transitionDuration: const Duration(milliseconds: 180),
-    transitionBuilder: (_, a, _, child) => FadeTransition(opacity: a, child: child),
-    pageBuilder: (ctx, _, _) => _Sheet(
+  return showControlSheetBuilder(
+    context,
+    (_) => ControlSheet(
       title: title,
       state: state,
       value: value,
@@ -49,8 +52,29 @@ Future<void> showControlSheet(
   );
 }
 
-class _Sheet extends StatefulWidget {
-  const _Sheet({
+/// Allows an entity-specific dialog to follow state changes without recreating
+/// the route or losing the value under a finger.
+Future<void> showControlSheetBuilder(
+  BuildContext context,
+  WidgetBuilder builder,
+) {
+  return showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: 'close',
+    barrierColor: Ns.ground.withValues(alpha: .72),
+    transitionDuration: const Duration(milliseconds: 180),
+    transitionBuilder: (_, a, _, child) =>
+        FadeTransition(opacity: a, child: child),
+    pageBuilder: (ctx, _, _) => builder(ctx),
+  );
+}
+
+class ControlSheet extends StatefulWidget {
+  const ControlSheet({
+    super.key,
+    this.showLevel = true,
+    this.enabled = true,
     required this.title,
     required this.state,
     required this.value,
@@ -62,6 +86,7 @@ class _Sheet extends StatefulWidget {
     this.onCommit,
   });
 
+  final bool showLevel, enabled;
   final String title, state;
   final double value, step;
   final Color accent;
@@ -71,14 +96,23 @@ class _Sheet extends StatefulWidget {
   final ValueChanged<double>? onCommit;
 
   @override
-  State<_Sheet> createState() => _SheetState();
+  State<ControlSheet> createState() => _SheetState();
 }
 
-class _SheetState extends State<_Sheet> {
+class _SheetState extends State<ControlSheet> {
   late double _v = widget.value;
   bool _dragging = false;
+  bool _cancelled = false;
+
+  @override
+  void didUpdateWidget(ControlSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.enabled || !widget.showLevel) _dragging = false;
+    if (!_dragging && widget.value != oldWidget.value) _v = widget.value;
+  }
 
   void _set(double v, {bool commit = false}) {
+    if (!widget.enabled || !widget.showLevel) return;
     _v = v.clamp(0.0, 1.0);
     setState(() {});
     if (commit) {
@@ -110,12 +144,24 @@ class _SheetState extends State<_Sheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(widget.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Ns.text, fontSize: 22, fontWeight: FontWeight.w700)),
-                        Text(widget.state,
-                            style: const TextStyle(color: Ns.muted, fontSize: 15, fontWeight: FontWeight.w500)),
+                        Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Ns.text,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        Text(
+                          widget.state,
+                          style: const TextStyle(
+                            color: Ns.muted,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -127,122 +173,197 @@ class _SheetState extends State<_Sheet> {
                 ],
               ),
               const SizedBox(height: 14),
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: LayoutBuilder(
-                        builder: (_, box) {
-                          final h = box.maxHeight;
-                          double fromY(double y) => (1 - y / h).clamp(0.0, 1.0);
-                          return GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTapDown: (d) => _set(fromY(d.localPosition.dy), commit: true),
-                            onVerticalDragStart: (d) {
-                              _dragging = true;
-                              _set(fromY(d.localPosition.dy));
-                            },
-                            onVerticalDragUpdate: (d) => _set(fromY(d.localPosition.dy)),
-                            onVerticalDragEnd: (_) {
-                              _dragging = false;
-                              _set(_v, commit: true);
-                            },
-                            child: Container(
-                              clipBehavior: Clip.antiAlias,
-                              decoration: BoxDecoration(
-                                color: Ns.surface,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  TweenAnimationBuilder<double>(
-                                    tween: Tween(end: _v),
-                                    duration: _dragging ? Duration.zero : const Duration(milliseconds: 120),
-                                    builder: (_, v, child) => FractionalTranslation(
-                                      translation: widget.fromTop ? Offset(0, -v) : Offset(0, 1 - v),
-                                      child: child,
+              if (!widget.showLevel)
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      widget.state,
+                      style: const TextStyle(
+                        color: Ns.text,
+                        fontSize: 36,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: AbsorbPointer(
+                    absorbing: !widget.enabled,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: LayoutBuilder(
+                            builder: (_, box) {
+                              final h = box.maxHeight;
+                              double fromY(double y) =>
+                                  (1 - y / h).clamp(0.0, 1.0);
+                              return Listener(
+                                onPointerDown: (_) {
+                                  _cancelled = false;
+                                },
+                                onPointerCancel: (_) {
+                                  _cancelled = true;
+                                },
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTapUp: (d) => _set(
+                                    fromY(d.localPosition.dy),
+                                    commit: true,
+                                  ),
+                                  onVerticalDragStart: (d) {
+                                    _dragging = true;
+                                    _set(fromY(d.localPosition.dy));
+                                  },
+                                  onVerticalDragUpdate: (d) =>
+                                      _set(fromY(d.localPosition.dy)),
+                                  onVerticalDragCancel: () {
+                                    _dragging = false;
+                                  },
+                                  onVerticalDragEnd: (_) {
+                                    final commit = _dragging && !_cancelled;
+                                    _dragging = false;
+                                    if (commit) _set(_v, commit: true);
+                                  },
+                                  child: Container(
+                                    clipBehavior: Clip.antiAlias,
+                                    decoration: BoxDecoration(
+                                      color: Ns.surface,
+                                      borderRadius: BorderRadius.circular(20),
                                     ),
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: [widget.accent, stops.strong],
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        TweenAnimationBuilder<double>(
+                                          tween: Tween(end: _v),
+                                          duration: _dragging
+                                              ? Duration.zero
+                                              : const Duration(
+                                                  milliseconds: 120,
+                                                ),
+                                          builder: (_, v, child) =>
+                                              FractionalTranslation(
+                                                translation: widget.fromTop
+                                                    ? Offset(0, -v)
+                                                    : Offset(0, 1 - v),
+                                                child: child,
+                                              ),
+                                          child: DecoratedBox(
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                end: Alignment.bottomCenter,
+                                                colors: [
+                                                  widget.accent,
+                                                  stops.strong,
+                                                ],
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                      ),
+                                        Center(
+                                          child: Text(
+                                            '${(_v * 100).round()}%',
+                                            style: const TextStyle(
+                                              color: Ns.text,
+                                              fontSize: 44,
+                                              fontWeight: FontWeight.w700,
+                                              fontFeatures: Ns.tabular,
+                                              shadows: Ns.shadow,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  Center(
-                                    child: Text('${(_v * 100).round()}%',
-                                        style: const TextStyle(
-                                            color: Ns.text,
-                                            fontSize: 44,
-                                            fontWeight: FontWeight.w700,
-                                            fontFeatures: Ns.tabular,
-                                            shadows: Ns.shadow)),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        SizedBox(
+                          width: 96,
+                          child: Column(
+                            children: [
+                              Expanded(
+                                child: _Square(
+                                  onTap: () => _stepBy(widget.step),
+                                  child: const Icon(
+                                    Icons.add,
+                                    color: Ns.text,
+                                    size: 34,
                                   ),
-                                ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    SizedBox(
-                      width: 96,
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: _Square(
-                              onTap: () => _stepBy(widget.step),
-                              child: const Icon(Icons.add, color: Ns.text, size: 34),
-                            ),
+                              const SizedBox(height: 14),
+                              Expanded(
+                                child: _Square(
+                                  onTap: () => _stepBy(-widget.step),
+                                  child: const Icon(
+                                    Icons.remove,
+                                    color: Ns.text,
+                                    size: 34,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 14),
-                          Expanded(
-                            child: _Square(
-                              onTap: () => _stepBy(-widget.step),
-                              child: const Icon(Icons.remove, color: Ns.text, size: 34),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
               if (widget.actions.isNotEmpty) ...[
                 const SizedBox(height: 14),
                 SizedBox(
                   height: 76,
                   child: Row(
                     children: [
-                      for (var i = 0; i < widget.actions.length && i < 4; i++) ...[
+                      for (
+                        var i = 0;
+                        i < widget.actions.length && i < 4;
+                        i++
+                      ) ...[
                         if (i > 0) const SizedBox(width: 8),
                         Expanded(
                           child: _Square(
-                            color: widget.actions[i].primary ? widget.accent : Ns.surface,
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              widget.actions[i].run();
-                              if (widget.actions[i].close) Navigator.of(context).pop();
-                            },
+                            color: widget.actions[i].primary
+                                ? widget.accent
+                                : Ns.surface,
+                            onTap: !widget.enabled || !widget.actions[i].enabled
+                                ? null
+                                : () {
+                                    HapticFeedback.lightImpact();
+                                    widget.actions[i].run();
+                                    if (widget.actions[i].close) {
+                                      Navigator.of(context).pop();
+                                    }
+                                  },
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 if (widget.actions[i].icon != null)
-                                  Icon(widget.actions[i].icon,
-                                      size: 24, color: widget.actions[i].primary ? Ns.ground : Ns.text),
+                                  Icon(
+                                    widget.actions[i].icon,
+                                    size: 24,
+                                    color: widget.actions[i].primary
+                                        ? Ns.ground
+                                        : Ns.text,
+                                  ),
                                 const SizedBox(height: 4),
-                                Text(widget.actions[i].label,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                        color: widget.actions[i].primary ? Ns.ground : Ns.text,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600)),
+                                Text(
+                                  widget.actions[i].label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: widget.actions[i].primary
+                                        ? Ns.ground
+                                        : Ns.text,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
@@ -261,22 +382,33 @@ class _SheetState extends State<_Sheet> {
 }
 
 class _Square extends StatelessWidget {
-  const _Square({required this.onTap, required this.child, this.size, this.color = Ns.surface});
-  final VoidCallback onTap;
+  const _Square({
+    required this.onTap,
+    required this.child,
+    this.size,
+    this.color = Ns.surface,
+  });
+  final VoidCallback? onTap;
   final Widget child;
   final double? size;
   final Color color;
 
   @override
   Widget build(BuildContext context) => GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Container(
-          width: size,
-          height: size,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(18)),
-          child: child,
+    behavior: HitTestBehavior.opaque,
+    onTap: onTap,
+    child: Opacity(
+      opacity: onTap == null ? .35 : 1,
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(18),
         ),
-      );
+        child: child,
+      ),
+    ),
+  );
 }
