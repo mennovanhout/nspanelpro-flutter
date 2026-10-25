@@ -9,17 +9,9 @@ import '../ui/theme.dart';
 import '../util/color.dart';
 import '../util/fmt.dart';
 import '../util/icons.dart';
+import '../util/weather.dart';
 import 'env.dart';
 
-const _conditionLabels = {
-  'partlycloudy': 'Partly cloudy',
-  'clear-night': 'Clear',
-  'lightning-rainy': 'Thunder, rain',
-  'snowy-rainy': 'Sleet',
-  'windy-variant': 'Windy',
-  'pouring': 'Heavy rain',
-  'exceptional': 'Severe',
-};
 const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /// Current conditions off the entity; the forecast over its own websocket
@@ -66,14 +58,19 @@ class _WeatherCardState extends State<WeatherCard> {
     }
     _subscribing = true;
     try {
-      _unsub = await widget.env.conn.subscribe({
-        'type': 'weather/subscribe_forecast',
-        'forecast_type': c.str('forecast_type') ?? 'daily',
-        'entity_id': entity,
-      }, (ev) {
-        if (!mounted) return;
-        setState(() => _forecast = (ev as Map?)?['forecast'] as List? ?? const []);
-      });
+      _unsub = await widget.env.conn.subscribe(
+        {
+          'type': 'weather/subscribe_forecast',
+          'forecast_type': c.str('forecast_type') ?? 'daily',
+          'entity_id': entity,
+        },
+        (ev) {
+          if (!mounted) return;
+          setState(
+            () => _forecast = (ev as Map?)?['forecast'] as List? ?? const [],
+          );
+        },
+      );
     } catch (_) {
       // Older core: the attribute fallback below covers it.
     } finally {
@@ -89,23 +86,35 @@ class _WeatherCardState extends State<WeatherCard> {
         final broken = s == null || s.isBroken;
         final temp = s?.numAttr('temperature');
         final unit = s?.attr<String>('temperature_unit') ?? '°';
+        final rainUnit = s?.attr<String>('precipitation_unit') ?? 'mm';
         final bits = <String>[];
         if (s != null && s.state.isNotEmpty) {
-          bits.add(_conditionLabels[s.state] ?? capitalise(s.state.replaceAll('-', ' ')));
+          bits.add(conditionLabel(s.state));
         }
         final hum = s?.numAttr('humidity');
         if (hum != null) bits.add('${fmt(hum, 0)}%');
         final wind = s?.numAttr('wind_speed');
-        if (wind != null) bits.add('${fmt(wind, 0)} ${s?.attr<String>('wind_speed_unit') ?? ''}'.trim());
+        if (wind != null) {
+          bits.add(
+            '${fmt(wind, 0)} ${s?.attr<String>('wind_speed_unit') ?? ''}'
+                .trim(),
+          );
+        }
 
-        final list = (c.boolOr('show_forecast', true)
-                ? (_forecast ?? (s?.attributes['forecast'] as List?) ?? const [])
-                : const [])
-            .take(c.intOr('forecast_count', 4).clamp(1, 5))
-            .toList();
+        final list =
+            (c.boolOr('show_forecast', true)
+                    ? (_forecast ??
+                          (s?.attributes['forecast'] as List?) ??
+                          const [])
+                    : const [])
+                .take(c.intOr('forecast_count', 4).clamp(1, 5))
+                .toList();
 
         return InfoShell(
-          height: c.numOr('height', 240),
+          height: c.numOr(
+            'height',
+            c.boolOr('show_precipitation', false) ? 280 : 240,
+          ),
           accent: parseHex(c.str('accent')) ?? Ns.sky,
           broken: broken,
           child: Column(
@@ -115,26 +124,46 @@ class _WeatherCardState extends State<WeatherCard> {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconBox(mdi(c.str('icon') ?? weatherIcons[s?.state] ?? 'mdi:weather-cloudy')),
+                  IconBox(
+                    mdi(
+                      c.str('icon') ??
+                          weatherIcons[s?.state] ??
+                          'mdi:weather-cloudy',
+                    ),
+                  ),
                   const Spacer(),
-                  BigValue(temp == null ? '—' : fmt(temp, 0), unit: temp == null ? '' : unit),
+                  BigValue(
+                    temp == null ? '—' : fmt(temp, 0),
+                    unit: temp == null ? '' : unit,
+                  ),
                 ],
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(c.titleOr(friendlyName(s, entity)), maxLines: 1, overflow: TextOverflow.ellipsis, style: nameStyle),
-                  Text(broken ? 'Unavailable' : bits.join(' · '),
-                      maxLines: 1, overflow: TextOverflow.ellipsis, style: subStyle),
+                  Text(
+                    c.titleOr(friendlyName(s, entity)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: nameStyle,
+                  ),
+                  Text(
+                    broken ? 'Unavailable' : bits.join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: subStyle,
+                  ),
                   if (list.isNotEmpty) ...[
                     const SizedBox(height: 14),
-                    Row(children: [
-                      for (var i = 0; i < list.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 8),
-                        Expanded(child: _day(list[i], unit)),
+                    Row(
+                      children: [
+                        for (var i = 0; i < list.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 8),
+                          Expanded(child: _day(list[i], unit, rainUnit)),
+                        ],
                       ],
-                    ]),
+                    ),
                   ],
                 ],
               ),
@@ -145,15 +174,21 @@ class _WeatherCardState extends State<WeatherCard> {
     );
   }
 
-  Widget _day(dynamic f, String unit) {
+  Widget _day(dynamic f, String unit, String rainUnit) {
     final m = f is Map ? f : const {};
     final when = DateTime.tryParse(m['datetime']?.toString() ?? '')?.toLocal();
     final hourly = c.str('forecast_type') == 'hourly';
     final label = when == null
         ? ''
-        : (hourly ? when.hour.toString().padLeft(2, '0') : _days[when.weekday - 1]);
+        : (hourly
+              ? when.hour.toString().padLeft(2, '0')
+              : _days[when.weekday - 1]);
     final hi = m['temperature'] as num?;
     final lo = m['templow'] as num?;
+    // the chance and the amount of rain, under the temperature
+    final rain = c.boolOr('show_precipitation', false)
+        ? rainOf(m, unit: rainUnit)
+        : null;
     return Container(
       padding: const EdgeInsets.fromLTRB(2, 8, 2, 10),
       decoration: BoxDecoration(
@@ -164,18 +199,50 @@ class _WeatherCardState extends State<WeatherCard> {
         children: [
           Text(label, style: const TextStyle(color: Ns.muted, fontSize: 12)),
           const SizedBox(height: 2),
-          Icon(mdi(weatherIcons[m['condition']] ?? 'mdi:weather-cloudy'), size: 22, color: Ns.text),
+          Icon(
+            mdi(weatherIcons[m['condition']] ?? 'mdi:weather-cloudy'),
+            size: 22,
+            color: Ns.text,
+          ),
           const SizedBox(height: 2),
           Text.rich(
-            TextSpan(children: [
-              TextSpan(text: fmt(hi, 0), style: const TextStyle(color: Ns.text, fontWeight: FontWeight.w700)),
-              if (lo != null)
+            TextSpan(
+              children: [
                 TextSpan(
+                  text: fmt(hi, 0),
+                  style: const TextStyle(
+                    color: Ns.text,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (lo != null)
+                  TextSpan(
                     text: ' ${fmt(lo, 0)}',
-                    style: TextStyle(color: Ns.text.withValues(alpha: .55), fontWeight: FontWeight.w500)),
-            ]),
+                    style: TextStyle(
+                      color: Ns.text.withValues(alpha: .55),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
+            ),
             style: const TextStyle(fontSize: 15, fontFeatures: Ns.tabular),
           ),
+          if (c.boolOr('show_precipitation', false)) ...[
+            const SizedBox(height: 3),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                rain?.text ?? '–',
+                maxLines: 1,
+                style: TextStyle(
+                  color: rain != null && rain.wet ? Ns.sky : Ns.muted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  fontFeatures: Ns.tabular,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -19,6 +19,8 @@ class ScreensaverConfig {
     this.clockDate = true,
     this.moveSeconds = 60,
     this.frost = true,
+    this.weather,
+    this.weatherForecast = true,
     this.sleep = false,
     this.sleepAfterSeconds = 0,
     this.wakeOnProximity = true,
@@ -61,6 +63,12 @@ class ScreensaverConfig {
   bool get clockWanders => !clockSpots.containsKey(clockPosition);
   final bool frost;
 
+  /// A weather entity to show with the clock: the condition and the
+  /// temperature, and with [weatherForecast] today's high, low and chance of
+  /// rain. Null: no weather.
+  final String? weather;
+  final bool weatherForecast;
+
   /// Turn the LCD backlight fully off [sleepAfterSeconds] into the
   /// screensaver (0: as soon as it starts). Proximity and Home Assistant
   /// still wake it; the photo is only shown until then.
@@ -94,6 +102,12 @@ class ScreensaverConfig {
     clockDate: m['clock_date'] is bool ? m['clock_date'] as bool : true,
     moveSeconds: (m['move_every'] as num?)?.toInt() ?? 60,
     frost: m['frost'] is bool ? m['frost'] as bool : true,
+    weather: (m['weather']?.toString().startsWith('weather.') ?? false)
+        ? m['weather'].toString()
+        : null,
+    weatherForecast: m['weather_forecast'] is bool
+        ? m['weather_forecast'] as bool
+        : true,
     sleep: m['sleep'] is bool ? m['sleep'] as bool : false,
     sleepAfterSeconds: ((m['sleep_after'] as num?)?.toInt() ?? 0).clamp(
       0,
@@ -124,6 +138,8 @@ class ScreensaverConfig {
       clockDate: clockDate,
       moveSeconds: moveSeconds,
       frost: frost,
+      weather: weather,
+      weatherForecast: weatherForecast,
       sleep: o['sleep'] is bool ? o['sleep'] as bool : sleep,
       sleepAfterSeconds:
           (o['sleep_after'] as num?)?.toInt().clamp(0, 86400) ??

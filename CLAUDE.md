@@ -58,6 +58,9 @@ sounds, TTS through HA, self-update from GitHub Releases, start on boot.
   camera card polls stills only while `active`. The warm-up's hidden copies are index -1 and
   never active. No stream, no decoder: one scaled JPEG per `interval`, the next asked for
   after the last arrived.
+- **HA's own `weather-forecast` card is drawn as ours** (`weatherConfigFromHa` in
+  `lib/util/weather.dart`, wired in the registry). Its options that mean the same thing map
+  across; keep that mapping when the weather card gains options.
 - **Any `*swipe-card` is the page list** (`pagesFromLovelace`), and its `dots` /
   `show_pagination` / `start` are the pager's (`pagerOptionsFromLovelace`). Both spellings
   stay supported: simple-swipe-card dashboards must keep working unchanged.

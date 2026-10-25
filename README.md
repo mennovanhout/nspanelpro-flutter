@@ -61,6 +61,11 @@ The switch card is the button card's sibling for switches, input booleans and fa
 is lit while its entity is on, and a tap turns it the other way, echoed at once for
 `echo_ms` so the tile never shows the old state under a finger.
 
+Home Assistant's own **weather forecast card** (`type: weather-forecast`) renders too, drawn
+as the nspanel weather card: `entity`, `name`, `show_forecast`, `forecast_type` and
+`forecast_slots` carry over, so a dashboard that already has one needs no rewrite. Add
+`show_precipitation: true` to either for the chance and amount of rain under each hour or day.
+
 The camera card is a doorbell or a driveway as a still, asked for at the card's own size and
 replaced about once a second - and only while its page is the one showing and the
 screensaver is not up, so a camera on its own page costs nothing the rest of the time. No
@@ -101,6 +106,9 @@ matching empty card, so Lovelace does not complain either); the app reads it and
   clock_date: true            # the day and date under the time; default true
   move_every: 60              # seconds between clock positions while it wanders; default 60
   frost: true                 # frosted panel behind the clock; default true
+  weather: weather.home       # the weather with the clock: condition and temperature now;
+                              # no default (no weather)
+  weather_forecast: true      # ...and today's high, low and chance of rain; default true
   sleep: false                # turn the backlight fully off while the screensaver runs
   sleep_after: 0              # ...this many seconds into it (0 = at once, the photo is
                               # skipped; 600 = ten minutes of photo, then dark)
@@ -110,6 +118,12 @@ matching empty card, so Lovelace does not complain either); the app reads it and
 
 The same keys also go under `screensaver` in a pushed `setup.json`, which is the right place
 when different panels want different pictures; the dashboard card wins when both exist.
+
+**Weather on the screensaver.** `weather:` names a weather entity, and the clock's panel gets
+a line under the date with the condition and the temperature now and, with
+`weather_forecast`, today's high and low and the chance and amount of rain when there is any.
+It scales with `clock_size` and moves with the clock. With `clock: false` the panel shows the
+weather on its own. The forecast is one subscription for as long as the screensaver is up.
 
 **Panel settings from Home Assistant.** The dashboard card is the config for every panel that
 shows that dashboard. When one panel wants something else - the hallway sleeps sooner, the

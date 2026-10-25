@@ -23,6 +23,7 @@ import 'ha/transport.dart';
 import 'ui/motion.dart';
 import 'ui/page_scope.dart';
 import 'ui/pager.dart';
+import 'ui/saver_weather.dart';
 import 'ui/screensaver.dart';
 import 'ui/setup_screen.dart';
 import 'ui/theme.dart';
@@ -32,7 +33,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.6.0';
+const appVersion = '0.7.0';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});
@@ -840,7 +841,18 @@ class _DashboardState extends State<Dashboard> {
                   onHidden: () {
                     if (mounted) setState(() => _saverMounted = false);
                   },
-                  child: Screensaver(config: _saver!, onWake: _wake),
+                  child: Screensaver(
+                    config: _saver!,
+                    onWake: _wake,
+                    weather: _saver!.weather == null
+                        ? null
+                        : SaverWeather(
+                            entity: _saver!.weather!,
+                            env: _env,
+                            forecast: _saver!.weatherForecast,
+                            size: _saver!.clockSize,
+                          ),
+                  ),
                 ),
               ),
             Positioned(
