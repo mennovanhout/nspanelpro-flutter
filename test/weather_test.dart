@@ -58,13 +58,26 @@ Future<PanelEnv> _env(FakeHa fake) async {
 
 void main() {
   test('rain, as short as a tile allows', () {
-    expect(rainOf(_forecast[0])!.text, '5%');
+    expect(
+      rainOf(_forecast[0])!.text,
+      '5% · 0mm',
+      reason: 'a dry hour says how dry',
+    );
     expect(rainOf(_forecast[0])!.wet, isFalse);
-    expect(rainOf(_forecast[1])!.text, '80% · 1.2 mm');
+    expect(rainOf(_forecast[1])!.text, '80% · 1.2mm');
     expect(rainOf(_forecast[1])!.wet, isTrue);
     expect(rainOf(_forecast[2]), isNull, reason: 'the provider sends neither');
-    expect(rainOf({'precipitation': 0.4}, unit: 'in')!.text, '0.4 in');
-    expect(rainOf({'precipitation': 0})!.text, '0 mm');
+    expect(rainOf({'precipitation': 0.4}, unit: 'in')!.text, '0.4in');
+    expect(rainOf({'precipitation': 0})!.text, '0mm');
+    expect(
+      rainOf({'precipitation_probability': 40})!.text,
+      '40%',
+      reason: 'a provider that sends only the chance',
+    );
+    expect(
+      rainOf({'precipitation_probability': 3, 'precipitation': 0.8})!.text,
+      '3% · 0.8mm',
+    );
   });
 
   test("Home Assistant's own weather card maps onto ours", () {
@@ -134,8 +147,8 @@ void main() {
         'show_precipitation': true,
         'height': 300,
       });
-      expect(find.text('80% · 1.2 mm'), findsOneWidget);
-      expect(find.text('5%'), findsOneWidget);
+      expect(find.text('80% · 1.2mm'), findsOneWidget);
+      expect(find.text('5% · 0mm'), findsOneWidget);
       expect(
         find.text('–'),
         findsOneWidget,
@@ -148,7 +161,7 @@ void main() {
         'entity': 'weather.home',
         'height': 300,
       });
-      expect(find.text('80% · 1.2 mm'), findsNothing);
+      expect(find.text('80% · 1.2mm'), findsNothing);
 
       // HA's own card renders, as ours
       await show({
@@ -160,7 +173,7 @@ void main() {
       });
       expect(find.byType(WeatherCard), findsOneWidget);
       expect(find.text('Garden'), findsOneWidget);
-      expect(find.text('80% · 1.2 mm'), findsOneWidget);
+      expect(find.text('80% · 1.2mm'), findsOneWidget);
       await tester.pumpWidget(const SizedBox());
       unawaited(env.conn.dispose());
     },
@@ -184,7 +197,7 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 50));
     expect(find.text('12°  Rainy'), findsOneWidget);
-    expect(find.text('12° / 9° · 80% · 1.2 mm rain'), findsOneWidget);
+    expect(find.text('12° / 9° · 80% · 1.2mm rain'), findsOneWidget);
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(

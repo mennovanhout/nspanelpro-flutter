@@ -16,7 +16,10 @@ String conditionLabel(String state) =>
     _conditionLabels[state] ?? capitalise(state.replaceAll('-', ' '));
 
 /// The rain in one forecast entry, as short as a forecast tile allows:
-/// `80% · 1.2 mm`, `40%`, `0.4 mm`. Null when the provider sends neither.
+/// `80% · 1.2mm`, `3% · 0mm`, and just the half the provider sends when it
+/// sends one. No space before the unit: five tiles across leave ~73 px. The amount is always shown when it is known, dry hours too:
+/// the chance alone cannot tell a drizzle from a downpour, and a missing
+/// amount looks like a missing feature. Null when the provider sends neither.
 /// [wet] is "worth noticing": a real chance, or any amount at all.
 ({String text, bool wet})? rainOf(
   Map<dynamic, dynamic> f, {
@@ -29,11 +32,9 @@ String conditionLabel(String state) =>
   if (prob == null && amount == null) return null;
   final parts = <String>[
     if (prob != null) '${prob.round()}%',
-    if (amount != null && amount > 0)
-      '${fmt(amount, amount < 10 ? 1 : 0)} $unit',
+    if (amount != null)
+      amount > 0 ? '${fmt(amount, amount < 10 ? 1 : 0)}$unit' : '0$unit',
   ];
-  // nothing in either: still say so, so a dry hour reads as dry rather than unknown
-  if (parts.isEmpty) parts.add('0 $unit');
   return (text: parts.join(' · '), wet: (prob ?? 0) >= 30 || (amount ?? 0) > 0);
 }
 
