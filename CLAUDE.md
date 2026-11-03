@@ -67,6 +67,10 @@ sounds, TTS through HA, self-update from GitHub Releases, start on boot.
 - **Card options are the cards repo's.** When adding an option here, add it to the cards repo
   (default literal, README row, editor schema) or document it as native-only in both READMEs.
   Native-only today: `sounds` and `haptics` on the alarm card.
+- **A gray card on the panel is an exception in that card's build or layout.** Release builds
+  draw a throwing widget as a plain gray box and log nothing visible. Reproduce it in a widget
+  test inside a `Column`, as a page is, and assert `tester.takeException()` is null (see
+  `status_widget_test.dart`: an unstretched `TileGrid` row once forced an infinite height).
 - **Tests run against fakes, not the house.** `test/connection_test.dart` has `FakeHa` (the
   websocket, including a refused alarm code), `test/mqtt_client_test.dart` a fake broker,
   `test/adb_test.dart` a fake adbd. A widget test of a flow (see `alarm_widget_test.dart`)
