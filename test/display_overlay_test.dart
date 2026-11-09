@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nspanel_app/config/screensaver.dart';
 import 'package:nspanel_app/ui/display_overlay.dart';
@@ -30,6 +31,31 @@ void main() {
     await t.pump(const Duration(milliseconds: 1));
     expect(find.byType(Screensaver), findsNothing);
     expect(find.byType(ColoredBox), findsWidgets);
+    await t.pumpWidget(const SizedBox());
+    c.dispose();
+  });
+  testWidgets('the clock has no error underline and carries the weather', (t) async {
+    final c = DisplayController(Driver())
+      ..configure(const ScreensaverConfig(afterSeconds: 15), active: true);
+    await t.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => DisplayOverlay(
+          controller: c,
+          weather: ValueNotifier<Widget?>(const Text('12 Cloudy')),
+          child: child!,
+        ),
+        home: const Scaffold(),
+      ),
+    );
+    c.sleep(force: true);
+    await t.pump();
+    await t.pump(const Duration(milliseconds: 800));
+    expect(find.text('12 Cloudy'), findsOneWidget);
+    final style = t
+        .renderObject<RenderParagraph>(find.text('12 Cloudy'))
+        .text
+        .style;
+    expect(style?.decoration, isNot(TextDecoration.underline));
     await t.pumpWidget(const SizedBox());
     c.dispose();
   });
@@ -73,6 +99,7 @@ void main() {
       await t.tapAt(position);
       await t.pump();
       expect(actions, 0);
+      await t.pump(const Duration(milliseconds: 400)); // the fade out
       expect(find.byType(Screensaver), findsNothing);
       expect(find.text('Simulated action'), findsOneWidget);
       await t.tapAt(position);

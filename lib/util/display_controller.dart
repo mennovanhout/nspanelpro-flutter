@@ -54,10 +54,17 @@ class DisplayController extends ChangeNotifier {
     final wasEnabled = enabled;
     enabled = active;
     if (active && !wasEnabled && !interactive && next?.sleep == true) {
+      debugPrint('display: asleep at start, resuming the screensaver');
       saving = true;
       _wantDark = true;
       unawaited(driver.saver(true));
       unawaited(driver.holdCpu(true));
+    } else if (active && !wasEnabled && !interactive && _observed) {
+      // Started in the dark with no sleep configured: nothing would ever turn
+      // the display back on.
+      debugPrint('display: asleep at start, waking');
+      _generation++;
+      _reconcile();
     }
     if (!active) {
       _cancelTimers();
@@ -109,6 +116,12 @@ class DisplayController extends ChangeNotifier {
       notifyListeners();
       return;
     }
+    if (initial && !screenOn && enabled && !effective.sleep) {
+      debugPrint('display: asleep at start, waking');
+      wake();
+      notifyListeners();
+      return;
+    }
     if (!screenOn && enabled) {
       // External sleep and cold starts in the dark join the same state.
       _idle?.cancel();
@@ -146,17 +159,23 @@ class DisplayController extends ChangeNotifier {
     near = value;
     if (!near) _nearBlocked = false;
     if (enabled && foreground) {
-      if (near && effective.wakeOnProximity && !_nearBlocked) {
-        wake();
-      } else if (!saving) {
+      // Walking past an awake dashboard is not activity: only a screensaver
+      // can be woken, and only keep_awake_on_proximity touches the idle timer.
+      if (near &&
+          effective.wakeOnProximity &&
+          !_nearBlocked &&
+          (saving || !interactive)) {
+        wake('approach');
+      } else if (!saving && effective.keepAwakeOnProximity) {
         _arm();
       }
     }
     notifyListeners();
   }
 
-  void wake() {
+  void wake([String why = 'touch or HA']) {
     if (_disposed || !enabled || !foreground) return;
+    if (saving) debugPrint('screensaver: off ($why)');
     _forced = false;
     _screenOnForSaver = false;
     _nearBlocked = false;
@@ -183,6 +202,7 @@ class DisplayController extends ChangeNotifier {
     _forced = force;
     _nearBlocked = force && near;
     saving = true;
+    debugPrint('screensaver: on (${force ? 'switched on from HA' : 'idle'})');
     // Native gate must know about the overlay before it is displayed.
     final generation = ++_generation;
     unawaited(
@@ -225,6 +245,7 @@ class DisplayController extends ChangeNotifier {
           if (_wantDark && interactive && enabled && foreground) {
             final off = await driver.off();
             if (off) {
+              debugPrint('display: off');
               interactive = false;
               if (_disposed || !enabled || !foreground) {
                 await driver.on();
@@ -235,6 +256,7 @@ class DisplayController extends ChangeNotifier {
               debugPrint('display: sleep failed; screensaver remains visible');
             }
           } else if (!_wantDark && !interactive && enabled && foreground) {
+            debugPrint('display: on');
             await driver.on();
             // Actual state is confirmed by Android's screen event.
           }

@@ -3,7 +3,6 @@ package nl.mennovanhout.nspanel_app
 import android.content.BroadcastReceiver
 import android.content.Intent
 import android.content.IntentFilter
-import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -54,23 +53,11 @@ class MainActivity : FlutterActivity() {
     private fun updateAwakeHold() {
         awakeHold.update(nativeIdleTimeout != null, foreground, power.isInteractive)
     }
-    private fun restoreSystemTimeout() {
-        val timeout = nativeIdleTimeout ?: return
-        if (Settings.System.canWrite(this) && Settings.System.getInt(contentResolver,
-                Settings.System.SCREEN_OFF_TIMEOUT, -1) != timeout) {
-            Settings.System.putInt(contentResolver, Settings.System.SCREEN_OFF_TIMEOUT, timeout)
-        }
-    }
     private var foreground = true
     private var fingers = 0
     private var lastTouch: MotionEvent? = null
     private var receiverRegistered = false
     private val displayHandler = Handler(Looper.getMainLooper())
-    private val timeoutObserver = object : ContentObserver(displayHandler) {
-        override fun onChange(selfChange: Boolean) {
-            if (foreground) restoreSystemTimeout()
-        }
-    }
     private var lifecycleGeneration = 0
     private val power get() = getSystemService(Context.POWER_SERVICE) as PowerManager
 
@@ -117,7 +104,9 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        syncScreen()
+        // A binder call per move is real work on this SoC; the screen does not
+        // change state mid-gesture without a broadcast or a DOWN/UP to see it.
+        if (event.actionMasked != MotionEvent.ACTION_MOVE) syncScreen()
         val start = event.actionMasked == MotionEvent.ACTION_DOWN
         val finish = event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL
         val wasSaver = saverVisible
@@ -144,7 +133,6 @@ class MainActivity : FlutterActivity() {
         super.onResume()
         lifecycleGeneration++
         foreground = true
-        restoreSystemTimeout()
         syncScreen()
         emitDisplay("lifecycle")
     }
@@ -156,7 +144,6 @@ class MainActivity : FlutterActivity() {
         // activity must keep the sensor alive; another foreground app must not.
         displayHandler.postDelayed({
             if (generation == lifecycleGeneration && power.isInteractive) {
-                restoreSystemTimeout()
                 foreground = false
                 updateAwakeHold()
                 if (::touchGuard.isInitialized && touchGuard.cancel()) cancelTouch()
@@ -203,8 +190,6 @@ class MainActivity : FlutterActivity() {
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(displayReceiver, filter, Context.RECEIVER_EXPORTED)
         else @Suppress("DEPRECATION") registerReceiver(displayReceiver, filter)
         receiverRegistered = true
-        contentResolver.registerContentObserver(
-            Settings.System.getUriFor(Settings.System.SCREEN_OFF_TIMEOUT), false, timeoutObserver)
         // A wall panel that goes to sleep is a wall. No plugin needed for one flag.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
@@ -245,7 +230,6 @@ class MainActivity : FlutterActivity() {
             when (call.method) {
                 "idleTimeout" -> {
                     nativeIdleTimeout = (call.arguments as? Number)?.toInt()?.coerceIn(10000, 86400000)
-                    restoreSystemTimeout()
                     updateAwakeHold()
                     result.success(null)
                 }
@@ -383,10 +367,7 @@ class MainActivity : FlutterActivity() {
         awakeHold.update(false, false, false)
         lifecycleGeneration++
         displayHandler.removeCallbacksAndMessages(null)
-        if (receiverRegistered) {
-            unregisterReceiver(displayReceiver)
-            contentResolver.unregisterContentObserver(timeoutObserver)
-        }
+        if (receiverRegistered) unregisterReceiver(displayReceiver)
         displayEvents = null
         lastTouch?.recycle()
         lastTouch = null

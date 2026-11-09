@@ -202,6 +202,7 @@ Every option, in one place:
 | `sleep_after` | `0` | seconds of picture before the backlight goes off; `0` is at once |
 | **Waking up** | | |
 | `wake_on_proximity` | `true` | someone walking up wakes it; touch always does |
+| `keep_awake_on_proximity` | `false` | also hold the screensaver off while someone is near; off, walking past changes nothing |
 | `proximity_delta` | `12` | how far the sensor must move from its resting level; 15% of that level is the floor, so a panel that rests at 400 needs 60 |
 | `proximity_below` | none | wake when the reading drops below this, instead of the learned level |
 | `proximity_above` | none | wake when the reading rises above this, instead of the learned level |
@@ -260,9 +261,7 @@ not add permissions, dashboard options or MQTT topics.
 
 Use exactly one display controller: disable competing custom sleep and wake modules
 in external panel tools when enabling native ownership. Keep their launcher/watchdog
-functions if needed. With the existing WRITE_SETTINGS grant, native ownership
-restores the configured idle interval as Android's fallback timeout, including
-firmware overrides during boot and handoff to another app. While the configured
+functions if needed. Android's own screen timeout setting is left alone. While the configured
 dashboard owns an awake display, a native display wake lock prevents Android's
 timeout from bypassing gesture and proximity activity. It does not wake the screen
 and is released on screen-off, app handoff, disabled ownership or destruction;

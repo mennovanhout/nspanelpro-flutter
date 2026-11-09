@@ -58,8 +58,11 @@ class _NsPanelAppState extends State<NsPanelApp> {
     debugShowCheckedModeBanner: false,
     theme: Ns.theme(),
     home: Shell(display: _display),
-    builder: (context, child) =>
-        DisplayOverlay(controller: _display.controller, child: child!),
+    builder: (context, child) => DisplayOverlay(
+      controller: _display.controller,
+      weather: _display.saverWeather,
+      child: child!,
+    ),
   );
 }
 
@@ -215,7 +218,21 @@ class _DashboardState extends State<Dashboard> {
   ScreensaverConfig? _saverFromDashboard;
   bool get _saving => widget.display.controller.saving;
 
-  void _configureDisplay() => widget.display.configure(_saver, active: true);
+  void _configureDisplay() {
+    final s = _saver;
+    // The overlay sits above the navigator, where there is no connection to
+    // HA; the dashboard hands it the finished widget.
+    widget.display.saverWeather.value = s?.weather == null
+        ? null
+        : SaverWeather(
+            key: ValueKey('${s!.weather}|${s.weatherForecast}|${s.clockSize}'),
+            entity: s.weather!,
+            env: _env,
+            forecast: s.weatherForecast,
+            size: s.clockSize,
+          );
+    widget.display.configure(s, active: true);
+  }
 
   int _lastTouchSerial = 0;
   void _displayChanged() {
