@@ -5,15 +5,17 @@ import '../ha/connection.dart';
 import '../ha/states.dart';
 import '../util/fmt.dart';
 import '../util/icons.dart';
+import '../util/weather.dart';
 import 'env.dart';
 
-const _days = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
+const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-/// Sonoff NSPanel Pro style weather screen.
+/// A full-screen weather page: `style: pro` on the weather card, native only.
 ///
-/// The background is one of the original Sonoff 1440x1440 weather images,
-/// served by Home Assistant. The image is decoded at approximately the panel
-/// display size rather than at its native 1440x1440 resolution.
+/// The background is a gradient per condition, or, with `background_url`, a
+/// folder of your own pictures named after the condition (Sunny.png, Cloud.png,
+/// Rain.png, Snow.png, Thunder.png, Star.png). No artwork ships with the app. A
+/// picture is decoded at about the panel's size, whatever its own resolution.
 class WeatherProCard extends StatefulWidget {
   const WeatherProCard({
     super.key,
@@ -130,18 +132,23 @@ class _WeatherProCardState extends State<WeatherProCard> {
     }
   }
 
-  String _backgroundUrl(HaState? s) {
-    final base = c.str('background_url') ??
-        '/local/nspanel-weather/NSPanel';
-
+  String? _backgroundUrl(HaState? s) {
+    final base = c.str('background_url');
+    if (base == null || base.isEmpty) return null;
     final file = _background(s);
-
-    final url = base.endsWith('/')
-        ? '$base$file'
-        : '$base/$file';
-
+    final url = base.endsWith('/') ? '$base$file' : '$base/$file';
     return widget.env.settings.resolve(url);
   }
+
+  /// Top and bottom of the background when there is no picture.
+  List<Color> _gradient(HaState? s) => switch (_background(s)) {
+    'Sunny.png' => const [Color(0xFF2F7FD6), Color(0xFF8CC4EE)],
+    'Star.png' => const [Color(0xFF0B1230), Color(0xFF26315F)],
+    'Rain.png' => const [Color(0xFF2A3644), Color(0xFF55677A)],
+    'Snow.png' => const [Color(0xFF5E7388), Color(0xFFAFC0CF)],
+    'Thunder.png' => const [Color(0xFF1B1E33), Color(0xFF474A6B)],
+    _ => const [Color(0xFF3E4D5E), Color(0xFF8293A5)],
+  };
 
   ImageProvider _imageProvider(String url, BuildContext context) {
     final size = MediaQuery.sizeOf(context) *
@@ -156,30 +163,7 @@ class _WeatherProCardState extends State<WeatherProCard> {
     );
   }
 
-  String _conditionLabel(HaState? s) {
-    final condition = _condition(s);
-
-    const labels = {
-      'sunny': 'Ensoleillé',
-      'clear': 'Dégagé',
-      'clear-night': 'Ciel dégagé',
-      'partlycloudy': 'Partiellement nuageux',
-      'cloudy': 'Nuageux',
-      'rainy': 'Pluie',
-      'pouring': 'Forte pluie',
-      'snowy': 'Neige',
-      'snowy-rainy': 'Neige et pluie',
-      'lightning': 'Orage',
-      'lightning-rainy': 'Orage et pluie',
-      'hail': 'Grêle',
-      'fog': 'Brouillard',
-      'windy': 'Venteux',
-      'windy-variant': 'Venteux',
-    };
-
-    return labels[condition] ??
-        capitalise(condition.replaceAll('-', ' '));
-  }
+  String _conditionLabel(HaState? s) => conditionLabel(_condition(s));
 
   List<dynamic> _forecastList(HaState? s) {
     if (!c.boolOr('show_forecast', true)) {
@@ -226,16 +210,23 @@ class _WeatherProCardState extends State<WeatherProCard> {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // ----------------------------------------------------------------
-              // Sonoff original weather background
-              // ----------------------------------------------------------------
-              Image(
-                image: _imageProvider(background, context),
-                fit: BoxFit.cover,
-                gaplessPlayback: true,
-                errorBuilder: (_, _, _) =>
-                    const ColoredBox(color: Colors.black),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: _gradient(s),
+                  ),
+                ),
               ),
+              if (background != null)
+                Image(
+                  image: _imageProvider(background, context),
+                  fit: BoxFit.cover,
+                  gaplessPlayback: true,
+                  // a missing picture leaves the gradient, not a black page
+                  errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                ),
 
               // ----------------------------------------------------------------
               // Slight darkening at the top and bottom to keep text readable.
@@ -324,7 +315,7 @@ class _WeatherProCardState extends State<WeatherProCard> {
                             mdi(
                               c.str('icon') ??
                                   weatherIcons[
-                                      s?.state] ??
+                                      s.state] ??
                                   'mdi:weather-cloudy',
                             ),
                             color: Colors.white,
@@ -414,7 +405,7 @@ class _WeatherProCardState extends State<WeatherProCard> {
                               const SizedBox(width: 18),
                               _info(
                                 Icons.nightlight_round,
-                                'Nuit',
+                                'Night',
                               ),
                             ],
                         ],
@@ -453,7 +444,7 @@ class _WeatherProCardState extends State<WeatherProCard> {
                   right: 18,
                   top: 18,
                   child: Text(
-                    'HORS LIGNE',
+                    'OFFLINE',
                     style: TextStyle(
                       color: Color(0xFFFF7777),
                       fontSize: 12,

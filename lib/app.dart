@@ -21,7 +21,9 @@ import 'ha/connection.dart';
 import 'ha/states.dart';
 import 'ha/transport.dart';
 import 'ui/motion.dart';
+import 'ui/page_scope.dart';
 import 'ui/pager.dart';
+import 'ui/saver_weather.dart';
 import 'ui/screensaver.dart';
 import 'ui/setup_screen.dart';
 import 'ui/theme.dart';
@@ -31,7 +33,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.4.0';
+const appVersion = '0.7.2';
 
 class NsPanelApp extends StatelessWidget {
   const NsPanelApp({super.key});
@@ -146,12 +148,17 @@ class Dashboard extends StatefulWidget {
 class _DashboardState extends State<Dashboard> {
   final _frames = FrameWatch();
   int _shown = 0; // the page on screen; only it animates its cards in
+  // the same, and whether the dashboard is visible at all, for cards that
+  // only work while they are on screen (the camera)
+  final _shownPage = ValueNotifier<int>(0);
+  final _awake = ValueNotifier<bool>(true);
   bool _warm = false;
   Timer? _warmTimer;
   late final HaStates _states = HaStates();
   late final HaConnection _conn;
   late final PanelEnv _env;
   List<PanelPage> _pages = const [];
+  PagerOptions _pager = const PagerOptions();
   String? _error;
   Future<void> Function()? _unsubLovelace;
   int _lovelaceGen = -1;
@@ -205,6 +212,7 @@ class _DashboardState extends State<Dashboard> {
       try {
         final cfg = (jsonDecode(cached) as Map).cast<String, dynamic>();
         _pages = pagesFromLovelace(cfg);
+        _pager = pagerOptionsFromLovelace(cfg);
         _scheduleWarmup();
         _saverFromDashboard = ScreensaverConfig.findInLovelace(cfg);
       } catch (_) {
@@ -216,6 +224,20 @@ class _DashboardState extends State<Dashboard> {
     _conn.status.addListener(_onStatus);
     _conn.start();
     _armIdle();
+    // A process that starts with the display asleep - after a self-update
+    // at night, or a crash - would draw the dashboard into a dark screen and
+    // wait. Either pick the dark screensaver up where it was, or wake up.
+    Timer(const Duration(seconds: 2), () async {
+      if (!mounted || await Device.isInteractive()) return;
+      if (_saver?.sleep == true) {
+        debugPrint('display: asleep at start, resuming the screensaver');
+        _dark = true;
+        _sleep();
+      } else {
+        debugPrint('display: asleep at start, waking');
+        _display.on();
+      }
+    });
     _announcer = Announcer(settings: widget.settings, conn: _conn);
     // host and user only - the password never goes anywhere near a log
     debugPrint(
@@ -334,15 +356,22 @@ class _DashboardState extends State<Dashboard> {
     });
   }
 
-  Widget _page(PanelPage p, {required bool animate}) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      for (var i = 0; i < p.cards.length; i++) ...[
-        if (i > 0) const SizedBox(height: Ns.gap),
-        // cards rise into place, staggered, when a page first shows
-        Enter(index: i, animate: animate, child: buildCard(p.cards[i], _env)),
+  /// `index` is the page's place in the pager, or -1 for the warm-up's
+  /// hidden copy, which must never count as on screen.
+  Widget _page(PanelPage p, {required bool animate, required int index}) => PageScope(
+    index: index,
+    shown: _shownPage,
+    awake: _awake,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < p.cards.length; i++) ...[
+          if (i > 0) const SizedBox(height: Ns.gap),
+          // cards rise into place, staggered, when a page first shows
+          Enter(index: i, animate: animate, child: buildCard(p.cards[i], _env)),
+        ],
       ],
-    ],
+    ),
   );
 
   void _publishUpdate() {
@@ -502,6 +531,7 @@ class _DashboardState extends State<Dashboard> {
       if (!mounted) return;
       setState(() {
         _pages = pages;
+        _pager = pagerOptionsFromLovelace(cfg);
         _scheduleWarmup();
         _saverFromDashboard = ScreensaverConfig.findInLovelace(cfg);
         // a fresh panel has no cached config, so this is the first moment
@@ -643,6 +673,7 @@ class _DashboardState extends State<Dashboard> {
     }
     setState(() {
       _saving = true;
+      _awake.value = false;
       _saverMounted = true;
     });
     debugPrint('screensaver: on (${force ? 'switched on from HA' : 'idle'})');
@@ -656,7 +687,12 @@ class _DashboardState extends State<Dashboard> {
   }
 
   Future<void> _goDark() async {
-    if (!_saving || _dark) return;
+    if (!_saving) return;
+    if (_dark) {
+      // already dark (resumed at start): keep the SoC awake for the sensor
+      await Device.holdCpu(true);
+      return;
+    }
     final ok = await _display.off();
     if (!_saving) {
       // woken while the key was in flight: undo it
@@ -693,6 +729,7 @@ class _DashboardState extends State<Dashboard> {
     }
     if (_saving) debugPrint('screensaver: off ($why)');
     if (mounted && _saving) setState(() => _saving = false);
+    _awake.value = true;
     _forcedSaver = null;
     _bridge?.screensaver(false);
     _armIdle();
@@ -746,14 +783,18 @@ class _DashboardState extends State<Dashboard> {
           children: [
             if (_pages.isNotEmpty)
               PanelPager(
+                key: ValueKey('pager|${_pager.dots}|${_pager.start}'),
+                showDots: _pager.dots,
+                initialPage: _pager.start,
                 jump: _pageJump,
                 onPage: (i) {
                   _shown = i;
+                  _shownPage.value = i;
                   _bridge?.page(i);
                 },
                 pages: [
                   for (var i = 0; i < _pages.length; i++)
-                    _page(_pages[i], animate: i == _shown),
+                    _page(_pages[i], animate: i == _shown, index: i),
                 ],
               )
             else
@@ -774,7 +815,7 @@ class _DashboardState extends State<Dashboard> {
             if (_warm)
               Warmup(
                 onDone: () => setState(() => _warm = false),
-                children: [for (final p in _pages) _page(p, animate: false)],
+                children: [for (final p in _pages) _page(p, animate: false, index: -1)],
               ),
             if (_error != null && _pages.isNotEmpty)
               Positioned(
@@ -800,7 +841,18 @@ class _DashboardState extends State<Dashboard> {
                   onHidden: () {
                     if (mounted) setState(() => _saverMounted = false);
                   },
-                  child: Screensaver(config: _saver!, onWake: _wake),
+                  child: Screensaver(
+                    config: _saver!,
+                    onWake: _wake,
+                    weather: _saver!.weather == null
+                        ? null
+                        : SaverWeather(
+                            entity: _saver!.weather!,
+                            env: _env,
+                            forecast: _saver!.weatherForecast,
+                            size: _saver!.clockSize,
+                          ),
+                  ),
                 ),
               ),
             Positioned(

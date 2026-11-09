@@ -4,6 +4,7 @@ import '../config/dashboard.dart';
 import '../ui/theme.dart';
 import 'alarm_card.dart';
 import 'button_card.dart';
+import 'camera_card.dart';
 import 'switch_card.dart';
 import 'climate_card.dart';
 import 'clock_card.dart';
@@ -16,6 +17,7 @@ import 'sensors_card.dart';
 import 'status_card.dart';
 import 'weather_card.dart';
 import 'weather_pro_card.dart';
+import '../util/weather.dart';
 
 /// `custom:nspanel-*` -> a widget. Anything else says so rather than
 /// vanishing, so a dashboard that mixes in an unsupported card still shows
@@ -30,6 +32,8 @@ Widget buildCard(CardConfig c, PanelEnv env) {
       return ClimateCard(config: c, env: env);
     case 'nspanel-media-card':
       return MediaCard(config: c, env: env);
+    case 'nspanel-camera-card':
+      return CameraCard(config: c, env: env);
     case 'nspanel-switch-card':
       return SwitchCard(config: c, env: env);
     case 'nspanel-button-card':
@@ -43,9 +47,14 @@ Widget buildCard(CardConfig c, PanelEnv env) {
     case 'nspanel-status-card':
       return StatusCard(config: c, env: env);
     case 'nspanel-weather-card':
-      return WeatherCard(config: c, env: env);
-    case 'nspanel-weather-pro-card':
-      return WeatherProCard(config: c, env: env);
+      // `style: pro` is native-only: the browser ignores the key and draws
+      // the normal weather card, so a dashboard works in both.
+      return c.str('style') == 'pro'
+          ? WeatherProCard(config: c, env: env)
+          : WeatherCard(config: c, env: env);
+    case 'weather-forecast':
+      // Home Assistant's own weather card, drawn as ours
+      return WeatherCard(config: weatherConfigFromHa(c), env: env);
     case 'nspanel-clock-card':
       return ClockCard(config: c, env: env);
     case 'nspanel-screensaver':

@@ -1,5 +1,7 @@
 # NSPanel app
 
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-donate-ffdd00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://bunq.me/mennovanhout)
+
 Home Assistant on the Sonoff NSPanel Pro 86, natively.
 
 A Flutter app that renders the `custom:nspanel-*` cards from
@@ -19,7 +21,9 @@ working - and the panel follows; edit the dashboard and it reloads on its own. T
 config still works in a browser with the web cards, on a phone or a tablet.
 
 The layout it expects is the one the cards' README recommends: a panel view holding a swipe
-card whose children are the pages. A view with no swipe card becomes one page. Cards it does
+card whose children are the pages - `custom:nspanel-swipe-card` from the cards bundle, or
+`custom:simple-swipe-card` if you already have it; the app treats either the same and honours
+`dots: false` (or `show_pagination: false`) and `start`. A view with no swipe card becomes one page. Cards it does
 not know are shown as a marked gap rather than dropped, so you can see what a dashboard is
 asking for that this app cannot do.
 
@@ -27,7 +31,7 @@ asking for that this app cannot do.
 views:
   - type: panel
     cards:
-      - type: custom:simple-swipe-card
+      - type: custom:nspanel-swipe-card
         cards:
           - type: vertical-stack
             cards:
@@ -56,6 +60,25 @@ Heights are in logical pixels, which on the panel at stock density are the panel
 The switch card is the button card's sibling for switches, input booleans and fans: each tile
 is lit while its entity is on, and a tap turns it the other way, echoed at once for
 `echo_ms` so the tile never shows the old state under a finger.
+
+Home Assistant's own **weather forecast card** (`type: weather-forecast`) renders too, drawn
+as the nspanel weather card: `entity`, `name`, `show_forecast`, `forecast_type` and
+`forecast_slots` carry over, so a dashboard that already has one needs no rewrite. Add
+`show_precipitation: true` to either for the chance and amount of rain under each hour or day.
+
+The camera card is a doorbell or a driveway as a still, asked for at the card's own size and
+replaced about once a second - and only while its page is the one showing and the
+screensaver is not up, so a camera on its own page costs nothing the rest of the time. No
+video decoder runs on this hardware; Home Assistant scales the still. With the **Screensaver**
+switch and the **Page** number of the panel's device, a doorbell automation can wake the
+panel, turn to the camera page and ring - the cards README has the automation.
+
+`style: pro` on `custom:nspanel-weather-card` draws a full-screen weather page: a big
+temperature over a gradient per condition, with the forecast along the bottom. It is native
+only; a browser ignores the key and draws the normal card. For pictures instead of gradients,
+set `background_url` to a folder Home Assistant serves, such as `/local/weather`, holding your
+own `Sunny.png`, `Cloud.png`, `Rain.png`, `Snow.png`, `Thunder.png` and `Star.png`. No artwork
+ships with the app. `height` defaults to 480 and `radius` to 0.
 
 The alarm card is the one with a keypad: when the alarm wants a code, arming or disarming
 opens one full screen, and a refused code says so and clears. It rings the built-in
@@ -90,15 +113,59 @@ matching empty card, so Lovelace does not complain either); the app reads it and
   clock_date: true            # the day and date under the time; default true
   move_every: 60              # seconds between clock positions while it wanders; default 60
   frost: true                 # frosted panel behind the clock; default true
+  weather: weather.home       # the weather with the clock: condition and temperature now;
+                              # no default (no weather)
+  weather_forecast: true      # ...and today's high, low and chance of rain; default true
   sleep: false                # turn the backlight fully off while the screensaver runs
   sleep_after: 0              # ...this many seconds into it (0 = at once, the photo is
                               # skipped; 600 = ten minutes of photo, then dark)
   wake_on_proximity: true     # default true
   proximity_delta: 12         # how far the reading must move from its resting level
+  # proximity_below: 30       # or wake on an absolute reading instead (no default)
+  # proximity_above: 90
 ```
+
+Every option, in one place:
+
+| Option | Default | |
+| --- | --- | --- |
+| **When** | | |
+| `after` | `300` | seconds without a touch before it starts; 10 at the least |
+| **The picture** | | |
+| `image_url` | none (black) | any URL that returns an image; one that returns a random image each time is ideal |
+| `image_refresh` | `600` | seconds between new pictures while it runs; 30 at the least |
+| `image_fit` | `contain` | `contain` shows the whole picture with black around it; `cover` fills the screen and crops |
+| **The clock** | | |
+| `clock` | `true` | `false` hides the time and the date |
+| `clock_position` | `wander` | `wander` moves it every `move_every` seconds; or a fixed spot: `center`, `top-left`, `top`, `top-right`, `left`, `right`, `bottom-left`, `bottom`, `bottom-right` |
+| `move_every` | `60` | seconds between spots while it wanders; 10 at the least |
+| `clock_size` | `64` | height of the digits in px, 24-160; the date, the weather and the panel scale with it |
+| `clock_date` | `true` | the day and date under the time |
+| `frost` | `true` | the frosted panel behind the clock; `false` for the text alone |
+| **Weather** | | |
+| `weather` | none | a `weather.*` entity: the condition and the temperature now, under the date |
+| `weather_forecast` | `true` | with `weather`: today's high and low, and the chance and amount of rain when there is any |
+| **Sleep** | | |
+| `sleep` | `false` | turn the backlight fully off while it runs; walking up or Home Assistant turns it back on |
+| `sleep_after` | `0` | seconds of picture before the backlight goes off; `0` is at once |
+| **Waking up** | | |
+| `wake_on_proximity` | `true` | someone walking up wakes it; touch always does |
+| `proximity_delta` | `12` | how far the sensor must move from its resting level; 15% of that level is the floor, so a panel that rests at 400 needs 60 |
+| `proximity_below` | none | wake when the reading drops below this, instead of the learned level |
+| `proximity_above` | none | wake when the reading rises above this, instead of the learned level |
+
+`after`, `sleep`, `sleep_after` and `proximity_delta` can also be set per panel from its device
+page in Home Assistant (**Idle timeout**, **Sleep**, **Sleep after**, **Wake sensitivity**);
+what is set there wins over this card for that one panel.
 
 The same keys also go under `screensaver` in a pushed `setup.json`, which is the right place
 when different panels want different pictures; the dashboard card wins when both exist.
+
+**Weather on the screensaver.** `weather:` names a weather entity, and the clock's panel gets
+a line under the date with the condition and the temperature now and, with
+`weather_forecast`, today's high and low and the chance and amount of rain when there is any.
+It scales with `clock_size` and moves with the clock. With `clock: false` the panel shows the
+weather on its own. The forecast is one subscription for as long as the screensaver is up.
 
 **Panel settings from Home Assistant.** The dashboard card is the config for every panel that
 shows that dashboard. When one panel wants something else - the hallway sleeps sooner, the
@@ -413,7 +480,7 @@ websocket client is a port of the one verified against a fake HA in the cards re
 tested the same way here (`flutter test`).
 
 Not here: Home Assistant's more-info dialog. Where the web cards open it, this app opens the
-card's own sheet (climate) or does nothing (read-only cards). And only these twelve card
+card's own sheet (climate) or does nothing (read-only cards). And only these thirteen card
 types render; this is a panel, not a browser.
 
 ## Layout

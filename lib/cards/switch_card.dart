@@ -129,6 +129,9 @@ class _SwitchCardState extends State<SwitchCard> {
         ? MdiIcons.alertCircleOutline
         : mdi(sw.item.str('icon') ?? s.attr<String>('icon') ?? (on ? pair.$1 : pair.$2), MdiIcons.toggleSwitchVariant);
     final label = sw.item.str('name') ?? friendlyName(s, sw.entity);
+    bool flag(String key) => sw.item[key] is bool ? sw.item[key] as bool : c.boolOr(key, true);
+    final showName = flag('show_name');
+    final showState = flag('show_state');
     final state = broken ? 'Unavailable' : (on ? c.str('on_text') ?? 'On' : c.str('off_text') ?? 'Off');
 
     return GestureDetector(
@@ -145,19 +148,27 @@ class _SwitchCardState extends State<SwitchCard> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: compact ? 32 : 40, color: on ? accent : Ns.muted),
-              const SizedBox(height: 8),
-              Text(label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                      color: on ? accent : Ns.text,
-                      fontSize: compact ? 15 : 18,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: -.2)),
-              Text(state,
-                  maxLines: 1,
-                  style: TextStyle(color: Ns.muted, fontSize: compact ? 13 : 14, height: 1.3)),
+              // without the name the icon takes its room; without both the
+              // tile is the icon alone, and the lit colour is the state
+              Icon(
+                icon,
+                size: showName ? (compact ? 32 : 40) : (compact ? 40 : 48),
+                color: on ? accent : Ns.muted,
+              ),
+              if (showName || showState) const SizedBox(height: 8),
+              if (showName)
+                Text(label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        color: on ? accent : Ns.text,
+                        fontSize: compact ? 15 : 18,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -.2)),
+              if (showState || broken)
+                Text(state,
+                    maxLines: 1,
+                    style: TextStyle(color: Ns.muted, fontSize: compact ? 13 : 14, height: 1.3)),
             ],
           ),
         ),
