@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 
 import '../config/screensaver.dart';
 import 'device.dart';
@@ -62,6 +62,9 @@ class DisplaySession {
         );
   }
   final controller = DisplayController(NativeDisplayDriver());
+
+  /// Shown with the screensaver clock; null for none.
+  final saverWeather = ValueNotifier<Widget?>(null);
   StreamSubscription<dynamic>? _events;
   StreamSubscription<double>? _sensor;
   ProximityPresence? _presence;
@@ -118,6 +121,7 @@ class DisplaySession {
       );
     }
     _presence?.dark(!controller.interactive);
+    _presence?.saver(controller.saving);
   }
 
   void dispose() {
@@ -127,5 +131,6 @@ class DisplaySession {
     _presence?.dispose();
     controller.removeListener(_changed);
     controller.dispose();
+    saverWeather.dispose();
   }
 }

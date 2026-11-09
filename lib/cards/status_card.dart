@@ -33,7 +33,9 @@ class StatusCard extends StatelessWidget {
   bool _isProblem(CardConfig item, HaState? s) {
     if (s == null) return true; // a missing entity is itself a problem
     if (s.isBroken) return true;
-    if (item['problem_when'] is List) return item.listOr('problem_when').contains(s.state);
+    if (item['problem_when'] is List) {
+      return item.listOr('problem_when').contains(s.state);
+    }
     final list = _problemWhen[item.str('entity')!.split('.').first];
     return list?.contains(s.state) ?? false;
   }
@@ -66,13 +68,17 @@ class StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ids = [for (final i in items) i.str('entity')].whereType<String>().toList();
+    final ids = [for (final i in items) i.str('entity')]
+        .whereType<String>()
+        .toList();
     final accent = parseHex(config.str('accent')) ?? Ns.gold;
     final onlyProblems = config.boolOr('only_problems', false);
     final columns = config.intOr('columns', 2).clamp(1, 3);
 
     return AnimatedBuilder(
-      animation: Listenable.merge([for (final id in ids) env.states.listen(id)]),
+      animation: Listenable.merge([
+        for (final id in ids) env.states.listen(id),
+      ]),
       builder: (context, _) {
         final tiles = <Widget>[];
         var problems = 0;
@@ -83,14 +89,18 @@ class StatusCard extends StatelessWidget {
           final bad = _isProblem(item, s);
           if (bad) problems++;
           if (onlyProblems && !bad) continue;
-          tiles.add(Tile(
-            icon: mdi(item.str('icon') ?? s?.attr<String>('icon') ?? classIcon(s, id)),
-            name: item.str('name') ?? friendlyName(s, id),
-            sub: _label(item, s),
-            alert: bad,
-            accent: accent,
-            compact: columns == 3,
-          ));
+          tiles.add(
+            Tile(
+              icon: mdi(
+                item.str('icon') ?? s?.attr<String>('icon') ?? classIcon(s, id),
+              ),
+              name: item.str('name') ?? friendlyName(s, id),
+              sub: _label(item, s),
+              alert: bad,
+              accent: accent,
+              compact: columns == 3,
+            ),
+          );
         }
         final allClear = onlyProblems && problems == 0;
         return InfoShell(
@@ -103,11 +113,25 @@ class StatusCard extends StatelessWidget {
                   children: [
                     Icon(MdiIcons.checkCircleOutline, size: 44, color: accent),
                     const SizedBox(height: 10),
-                    Text(config.str('all_clear') ?? 'All clear',
-                        style: const TextStyle(color: Ns.muted, fontSize: 18, fontWeight: FontWeight.w600)),
+                    Text(
+                      config.str('all_clear') ?? 'All clear',
+                      style: const TextStyle(
+                        color: Ns.muted,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ],
                 )
-              : ClipRect(child: TileGrid(columns: columns, children: tiles)),
+              // More tiles than fit are cut off at the card's edge, as in the
+              // browser, rather than overflowing: the scroll view only gives
+              // the grid room to lay out, it never scrolls.
+              : ClipRect(
+                  child: SingleChildScrollView(
+                    physics: const NeverScrollableScrollPhysics(),
+                    child: TileGrid(columns: columns, children: tiles),
+                  ),
+                ),
         );
       },
     );

@@ -45,9 +45,14 @@ class Screensaver extends StatefulWidget {
     required this.config,
     required this.onWake,
     this.imageProvider,
+    this.weather,
   });
   final ScreensaverConfig config;
   final VoidCallback onWake;
+
+  /// Shown in the clock's panel, under the date - or on its own when the
+  /// clock is off. Built by the caller, which has the connection to HA.
+  final Widget? weather;
 
   /// Where a photo URL becomes an image; tests hand in a MemoryImage.
   final ImageProvider Function(String url)? imageProvider;
@@ -224,18 +229,19 @@ class _ScreensaverState extends State<Screensaver> {
                 ),
               ),
             ),
-          if (cfg.clock)
+          if (cfg.clock || widget.weather != null)
             AnimatedAlign(
               alignment: _spot,
               duration: const Duration(milliseconds: 800),
               curve: Curves.easeInOutCubic,
               child: _FrostedClock(
-                time: '$hh:$mm',
-                date: cfg.clockDate
+                time: cfg.clock ? '$hh:$mm' : null,
+                date: cfg.clock && cfg.clockDate
                     ? '${_days[_now.weekday - 1]} ${_now.day} ${_months[_now.month - 1]}'
                     : null,
                 frost: cfg.frost,
                 size: cfg.clockSize,
+                extra: widget.weather,
               ),
             ),
         ],
@@ -250,10 +256,12 @@ class _FrostedClock extends StatelessWidget {
     required this.date,
     required this.frost,
     required this.size,
+    this.extra,
   });
-  final String time;
+  final String? time;
   final String? date;
   final bool frost;
+  final Widget? extra;
 
   /// The digits' height; everything else is a proportion of it, so the
   /// 64 px default and a 120 px clock look like the same thing at two sizes.
@@ -276,24 +284,25 @@ class _FrostedClock extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            time,
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: size,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -2.5 * k,
-              height: 1,
-              fontFeatures: Ns.tabular,
-              shadows: const [
-                Shadow(
-                  offset: Offset(0, 1),
-                  blurRadius: 6,
-                  color: Color(0x80000000),
-                ),
-              ],
+          if (time != null)
+            Text(
+              time!,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: size,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -2.5 * k,
+                height: 1,
+                fontFeatures: Ns.tabular,
+                shadows: const [
+                  Shadow(
+                    offset: Offset(0, 1),
+                    blurRadius: 6,
+                    color: Color(0x80000000),
+                  ),
+                ],
+              ),
             ),
-          ),
           if (date != null) SizedBox(height: 6 * k),
           if (date != null)
             Text(
@@ -311,6 +320,10 @@ class _FrostedClock extends StatelessWidget {
                 ],
               ),
             ),
+          if (extra != null) ...[
+            if (time != null) SizedBox(height: 10 * k),
+            extra!,
+          ],
         ],
       ),
     );

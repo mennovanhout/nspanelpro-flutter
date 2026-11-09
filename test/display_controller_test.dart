@@ -185,6 +185,66 @@ void main() {
     expect(d.offs, 1);
     c.dispose();
   });
+  testWidgets('walking past does not postpone idle unless keep-awake is on', (
+    t,
+  ) async {
+    final d = Driver();
+    final c = DisplayController(d)
+      ..configure(const ScreensaverConfig(afterSeconds: 15), active: true);
+    await t.pump(const Duration(seconds: 10));
+    c.proximity(true);
+    await t.pump(const Duration(seconds: 1));
+    c.proximity(false);
+    await t.pump(const Duration(seconds: 5));
+    await t.pump(const Duration(milliseconds: 1));
+    expect(c.saving, true, reason: '16 s since the last touch');
+    c.dispose();
+  });
+  testWidgets('an approach still wakes the screensaver', (t) async {
+    final d = Driver();
+    final c = DisplayController(d)
+      ..configure(const ScreensaverConfig(afterSeconds: 15), active: true);
+    c.sleep(force: true);
+    await t.pump();
+    expect(c.saving, true);
+    c.proximity(true);
+    expect(c.saving, false);
+    c.dispose();
+  });
+  testWidgets('cold start in the dark with no sleep configured turns it on', (
+    t,
+  ) async {
+    final d = Driver();
+    final c = DisplayController(d);
+    c.platform(
+      kind: 'snapshot',
+      screenOn: false,
+      inForeground: true,
+      pointerCount: 0,
+    );
+    c.configure(const ScreensaverConfig(afterSeconds: 15), active: true);
+    await t.pump();
+    expect(d.ons, 1);
+    c.dispose();
+  });
+  testWidgets('the level moving when the picture appears is not an approach', (
+    t,
+  ) async {
+    final seen = <bool>[];
+    final p = ProximityPresence(const ScreensaverConfig(), seen.add);
+    for (var i = 0; i < 40; i++) {
+      p.feed(147);
+    }
+    p.saver(true);
+    for (var i = 0; i < 60; i++) {
+      p.feed(120);
+    }
+    expect(seen, isEmpty);
+    p.feed(200);
+    p.feed(200);
+    expect(seen, [true], reason: 'a real approach, from the new level');
+    p.dispose();
+  });
   testWidgets('cold start in the dark retains CPU and does not wake', (
     t,
   ) async {

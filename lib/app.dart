@@ -24,6 +24,7 @@ import 'ui/motion.dart';
 import 'ui/page_scope.dart';
 import 'ui/pager.dart';
 import 'ui/display_overlay.dart';
+import 'ui/saver_weather.dart';
 import 'ui/setup_screen.dart';
 import 'ui/theme.dart';
 import 'ui/warmup.dart';
@@ -32,7 +33,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.6.0';
+const appVersion = '0.7.2';
 
 class NsPanelApp extends StatefulWidget {
   const NsPanelApp({super.key});
@@ -54,8 +55,11 @@ class _NsPanelAppState extends State<NsPanelApp> {
     debugShowCheckedModeBanner: false,
     theme: Ns.theme(),
     home: Shell(display: _display),
-    builder: (context, child) =>
-        DisplayOverlay(controller: _display.controller, child: child!),
+    builder: (context, child) => DisplayOverlay(
+      controller: _display.controller,
+      weather: _display.saverWeather,
+      child: child!,
+    ),
   );
 }
 
@@ -184,7 +188,21 @@ class _DashboardState extends State<Dashboard> {
   ScreensaverConfig? _saverFromDashboard;
   bool get _saving => widget.display.controller.saving;
 
-  void _configureDisplay() => widget.display.configure(_saver, active: true);
+  void _configureDisplay() {
+    final s = _saver;
+    // The overlay sits above the navigator, where there is no connection to
+    // HA; the dashboard hands it the finished widget.
+    widget.display.saverWeather.value = s?.weather == null
+        ? null
+        : SaverWeather(
+            key: ValueKey('${s!.weather}|${s.weatherForecast}|${s.clockSize}'),
+            entity: s.weather!,
+            env: _env,
+            forecast: s.weatherForecast,
+            size: s.clockSize,
+          );
+    widget.display.configure(s, active: true);
+  }
 
   int _lastTouchSerial = 0;
   void _displayChanged() {

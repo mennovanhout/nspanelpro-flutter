@@ -61,6 +61,11 @@ The switch card is the button card's sibling for switches, input booleans and fa
 is lit while its entity is on, and a tap turns it the other way, echoed at once for
 `echo_ms` so the tile never shows the old state under a finger.
 
+Home Assistant's own **weather forecast card** (`type: weather-forecast`) renders too, drawn
+as the nspanel weather card: `entity`, `name`, `show_forecast`, `forecast_type` and
+`forecast_slots` carry over, so a dashboard that already has one needs no rewrite. Add
+`show_precipitation: true` to either for the chance and amount of rain under each hour or day.
+
 The camera card is a doorbell or a driveway as a still, asked for at the card's own size and
 replaced about once a second - and only while its page is the one showing and the
 screensaver is not up, so a camera on its own page costs nothing the rest of the time. No
@@ -101,15 +106,60 @@ matching empty card, so Lovelace does not complain either); the app reads it and
   clock_date: true            # the day and date under the time; default true
   move_every: 60              # seconds between clock positions while it wanders; default 60
   frost: true                 # frosted panel behind the clock; default true
+  weather: weather.home       # the weather with the clock: condition and temperature now;
+                              # no default (no weather)
+  weather_forecast: true      # ...and today's high, low and chance of rain; default true
   sleep: false                # turn the backlight fully off while the screensaver runs
   sleep_after: 0              # ...this many seconds into it (0 = at once, the photo is
                               # skipped; 600 = ten minutes of photo, then dark)
   wake_on_proximity: true     # default true
   proximity_delta: 12         # how far the reading must move from its resting level
+  # proximity_below: 30       # or wake on an absolute reading instead (no default)
+  # proximity_above: 90
 ```
+
+Every option, in one place:
+
+| Option | Default | |
+| --- | --- | --- |
+| **When** | | |
+| `after` | `300` | seconds without a touch before it starts; 10 at the least |
+| **The picture** | | |
+| `image_url` | none (black) | any URL that returns an image; one that returns a random image each time is ideal |
+| `image_refresh` | `600` | seconds between new pictures while it runs; 30 at the least |
+| `image_fit` | `contain` | `contain` shows the whole picture with black around it; `cover` fills the screen and crops |
+| **The clock** | | |
+| `clock` | `true` | `false` hides the time and the date |
+| `clock_position` | `wander` | `wander` moves it every `move_every` seconds; or a fixed spot: `center`, `top-left`, `top`, `top-right`, `left`, `right`, `bottom-left`, `bottom`, `bottom-right` |
+| `move_every` | `60` | seconds between spots while it wanders; 10 at the least |
+| `clock_size` | `64` | height of the digits in px, 24-160; the date, the weather and the panel scale with it |
+| `clock_date` | `true` | the day and date under the time |
+| `frost` | `true` | the frosted panel behind the clock; `false` for the text alone |
+| **Weather** | | |
+| `weather` | none | a `weather.*` entity: the condition and the temperature now, under the date |
+| `weather_forecast` | `true` | with `weather`: today's high and low, and the chance and amount of rain when there is any |
+| **Sleep** | | |
+| `sleep` | `false` | turn the backlight fully off while it runs; walking up or Home Assistant turns it back on |
+| `sleep_after` | `0` | seconds of picture before the backlight goes off; `0` is at once |
+| **Waking up** | | |
+| `wake_on_proximity` | `true` | someone walking up wakes it; touch always does |
+| `keep_awake_on_proximity` | `false` | also hold the screensaver off while someone is near; off, walking past changes nothing |
+| `proximity_delta` | `12` | how far the sensor must move from its resting level; 15% of that level is the floor, so a panel that rests at 400 needs 60 |
+| `proximity_below` | none | wake when the reading drops below this, instead of the learned level |
+| `proximity_above` | none | wake when the reading rises above this, instead of the learned level |
+
+`after`, `sleep`, `sleep_after` and `proximity_delta` can also be set per panel from its device
+page in Home Assistant (**Idle timeout**, **Sleep**, **Sleep after**, **Wake sensitivity**);
+what is set there wins over this card for that one panel.
 
 The same keys also go under `screensaver` in a pushed `setup.json`, which is the right place
 when different panels want different pictures; the dashboard card wins when both exist.
+
+**Weather on the screensaver.** `weather:` names a weather entity, and the clock's panel gets
+a line under the date with the condition and the temperature now and, with
+`weather_forecast`, today's high and low and the chance and amount of rain when there is any.
+It scales with `clock_size` and moves with the clock. With `clock: false` the panel shows the
+weather on its own. The forecast is one subscription for as long as the screensaver is up.
 
 **Panel settings from Home Assistant.** The dashboard card is the config for every panel that
 shows that dashboard. When one panel wants something else - the hallway sleeps sooner, the
@@ -152,9 +202,7 @@ not add permissions, dashboard options or MQTT topics.
 
 Use exactly one display controller: disable competing custom sleep and wake modules
 in external panel tools when enabling native ownership. Keep their launcher/watchdog
-functions if needed. With the existing WRITE_SETTINGS grant, native ownership
-restores the configured idle interval as Android's fallback timeout, including
-firmware overrides during boot and handoff to another app. While the configured
+functions if needed. Android's own screen timeout setting is left alone. While the configured
 dashboard owns an awake display, a native display wake lock prevents Android's
 timeout from bypassing gesture and proximity activity. It does not wake the screen
 and is released on screen-off, app handoff, disabled ownership or destruction;
