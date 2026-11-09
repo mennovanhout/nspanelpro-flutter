@@ -158,7 +158,7 @@ void main() {
     );
   }
   testWidgets(
-    'swapped switch disabled details, movement and unknown block actions',
+    'swapped switch disabled details, movement and unavailable block actions',
     (t) async {
       final (fake, states) = await switches.mount(
         t,
@@ -179,7 +179,7 @@ void main() {
         'switch.test',
         const HaState(
           entityId: 'switch.test',
-          state: 'unknown',
+          state: 'unavailable',
           attributes: {'friendly_name': 'Test entity'},
         ),
       );
