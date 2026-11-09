@@ -16,6 +16,7 @@ import 'sensor_card.dart';
 import 'sensors_card.dart';
 import 'status_card.dart';
 import 'weather_card.dart';
+import '../util/weather.dart';
 
 /// `custom:nspanel-*` -> a widget. Anything else says so rather than
 /// vanishing, so a dashboard that mixes in an unsupported card still shows
@@ -46,6 +47,9 @@ Widget buildCard(CardConfig c, PanelEnv env) {
       return StatusCard(config: c, env: env);
     case 'nspanel-weather-card':
       return WeatherCard(config: c, env: env);
+    case 'weather-forecast':
+      // Home Assistant's own weather card, drawn as ours
+      return WeatherCard(config: weatherConfigFromHa(c), env: env);
     case 'nspanel-clock-card':
       return ClockCard(config: c, env: env);
     case 'nspanel-screensaver':

@@ -118,6 +118,10 @@ class _SwitchCardState extends State<SwitchCard> {
     super.dispose();
   }
 
+  /// Missing or unavailable. Not [HaState.isBroken]: an assumed-state switch
+  /// sits at `unknown` and still works, as it does in the web card.
+  bool _dead(HaState? s) => s == null || s.state == 'unavailable';
+
   /// The state as shown: the tap's for echo_ms after it, then HA's.
   bool _isOn(_Sw s) {
     if (s.local != null && DateTime.now().isBefore(s.localUntil)) {
@@ -128,8 +132,7 @@ class _SwitchCardState extends State<SwitchCard> {
   }
 
   Future<void> _press(_Sw s) async {
-    final current = widget.env.states.get(s.entity);
-    if (current == null || current.isBroken) return;
+    if (_dead(widget.env.states.get(s.entity))) return;
     if (c.boolOr('haptics', true)) HapticFeedback.lightImpact();
     final on = !_isOn(s);
     final echo = c.intOr('echo_ms', 1500);
@@ -198,7 +201,7 @@ class _SwitchCardState extends State<SwitchCard> {
 
   Widget _tile(_Sw sw, Color accent) {
     final s = widget.env.states.get(sw.entity);
-    final broken = s == null || s.isBroken;
+    final broken = s == null || s.state == 'unavailable';
     final on = !broken && _isOn(sw);
     final compact = _columns == 3;
     final pair = _icons[sw.entity.split('.').first] ?? _icons['switch']!;
@@ -219,12 +222,22 @@ class _SwitchCardState extends State<SwitchCard> {
         ? 'Unavailable'
         : (on ? c.str('on_text') ?? 'On' : c.str('off_text') ?? 'Off');
 
+    final swap = sw.item.boolOr(
+      'swap_press_actions',
+      c.boolOr('swap_press_actions', false),
+    );
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: broken ? null : () => _press(sw),
+      onTap: swap ? () => _details(sw) : (broken ? null : () => _press(sw)),
       // Recognize even a disabled hold, so releasing it cannot become a tap.
       // Flutter's gesture arena gives horizontal drags back to the pager.
-      onLongPress: () => _details(sw),
+      onLongPress: () {
+        if (swap) {
+          if (!broken) _press(sw);
+        } else {
+          _details(sw);
+        }
+      },
       child: Opacity(
         opacity: broken ? .45 : 1,
         child: Container(
