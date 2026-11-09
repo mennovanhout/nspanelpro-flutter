@@ -27,6 +27,7 @@ import 'ui/motion.dart';
 import 'ui/page_scope.dart';
 import 'ui/pager.dart';
 import 'ui/display_overlay.dart';
+import 'ui/saver_weather.dart';
 import 'ui/setup_screen.dart';
 import 'ui/theme.dart';
 import 'ui/warmup.dart';
@@ -35,7 +36,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.6.0';
+const appVersion = '0.7.2';
 
 class NsPanelApp extends StatefulWidget {
   const NsPanelApp({super.key});

@@ -170,6 +170,17 @@ void main() {
     'off details recall confirmed values, mark history, retain plain turn on',
     (t) async {
       final (f, states) = await mount(t, config: {'step_target': 'last_used'});
+      Color powerColor(String label) => t
+          .widget<SheetButton>(
+            find.ancestor(
+              of: find.text(label),
+              matching: find.byType(SheetButton),
+            ),
+          )
+          .color;
+      final onColor = powerColor('Turn off');
+      expect(onColor.g, greaterThan(onColor.r));
+      expect(onColor.b, onColor.g);
       states.update(
         'light.test',
         HaState(
@@ -186,6 +197,8 @@ void main() {
         ),
       );
       await t.pumpAndSettle();
+      expect(powerColor('Turn on'), Ns.surface);
+      expect(t.widget<Text>(find.text('Turn on')).style?.color, Ns.text);
       expect(find.text('Off · last values'), findsOneWidget);
       expect(slider(t, 'brightness').value, 128 / 255);
       expect(slider(t, 'hue').value, .5);
@@ -209,6 +222,92 @@ void main() {
       expect(last(f), {'entity_id': 'light.test'});
     },
   );
+
+  testWidgets(
+    'power uses on-state TW tint and neutral off action despite remembered values',
+    (t) async {
+      final (f, states) = await mount(t);
+      Color powerColor() => t
+          .widget<SheetButton>(
+            find.ancestor(
+              of: find.text('Turn on'),
+              matching: find.byType(SheetButton),
+            ),
+          )
+          .color;
+      states.update(
+        'light.test',
+        HaState(
+          entityId: 'light.test',
+          state: 'on',
+          attributes: {
+            ...attrs,
+            'color_mode': 'color_temp',
+            'color_temp_kelvin': 4000,
+          },
+        ),
+      );
+      await t.pumpAndSettle();
+      final warm = t
+          .widget<SheetButton>(
+            find.ancestor(
+              of: find.text('Turn off'),
+              matching: find.byType(SheetButton),
+            ),
+          )
+          .color;
+      states.update(
+        'light.test',
+        HaState(
+          entityId: 'light.test',
+          state: 'off',
+          attributes: {
+            ...attrs,
+            'brightness': null,
+            'color_mode': null,
+            'color_temp_kelvin': null,
+            'hs_color': null,
+          },
+        ),
+      );
+      await t.pumpAndSettle();
+      expect(warm, isNot(Ns.amber));
+      expect(warm.r, greaterThan(warm.b));
+      expect(powerColor(), Ns.surface);
+      expect(f.calls, isEmpty);
+    },
+  );
+
+  for (final config in [
+    {'accent': '#12abcd'},
+    {'follow_color': false},
+  ]) {
+    testWidgets('power preview respects $config', (t) async {
+      final (_, states) = await mount(t, config: config);
+      final button = t.widget<SheetButton>(
+        find.ancestor(
+          of: find.text('Turn off'),
+          matching: find.byType(SheetButton),
+        ),
+      );
+      expect(
+        button.color,
+        config.containsKey('accent') ? const Color(0xff12abcd) : Ns.amber,
+      );
+      states.update(
+        'light.test',
+        HaState(entityId: 'light.test', state: 'off', attributes: attrs),
+      );
+      await t.pumpAndSettle();
+      final off = t.widget<SheetButton>(
+        find.ancestor(
+          of: find.text('Turn on'),
+          matching: find.byType(SheetButton),
+        ),
+      );
+      expect(off.color, Ns.surface);
+    });
+  }
 
   testWidgets(
     'off failed edit rolls back to remembered value; acknowledgement does not learn draft',

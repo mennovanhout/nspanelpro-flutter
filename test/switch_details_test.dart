@@ -241,7 +241,15 @@ void main() {
     },
   );
 
-  for (final state in ['unavailable', 'unknown']) {
+  testWidgets('unknown: an assumed-state switch still works', (tester) async {
+    final (fake, _) = await mount(tester, state: 'unknown');
+    await tester.tap(find.text('Test entity'));
+    await tester.pump();
+    expect(fake.calls.single, startsWith('homeassistant.turn_on'));
+    await tester.pump(const Duration(seconds: 2));
+  });
+
+  for (final state in ['unavailable']) {
     testWidgets('$state: inspectable without actionable controls', (
       tester,
     ) async {

@@ -30,7 +30,7 @@ class _SwitchSheetState extends State<SwitchSheet> {
 
   Future<void> _set(bool on) async {
     final s = widget.env.states.get(entity);
-    if (_busy || !_controllable || s == null || s.isBroken) return;
+    if (_busy || !_controllable || s == null || s.state == 'unavailable') return;
     setState(() {
       _busy = true;
       _failed = false;
@@ -55,7 +55,8 @@ class _SwitchSheetState extends State<SwitchSheet> {
   Widget build(BuildContext context) => ValueListenableBuilder<HaState?>(
     valueListenable: widget.env.states.listen(entity),
     builder: (_, s, _) {
-      final available = s != null && !s.isBroken;
+      // `unknown` is the resting state of an assumed-state switch, not a fault
+      final available = s != null && s.state != 'unavailable';
       final on = s?.isOn ?? false;
       final state = !available
           ? 'Unavailable'

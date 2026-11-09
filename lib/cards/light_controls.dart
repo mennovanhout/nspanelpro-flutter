@@ -34,12 +34,20 @@ class LightControls {
   }
 
   /// The colour to paint the card in: the bulb's own when it has one and is
-  /// on, otherwise the configured accent. An explicit accent always wins.
-  Color accent(HaState? s) {
+  /// on, otherwise the configured accent. Details may supply their target colour
+  /// as a preview, including remembered off values. An explicit accent wins.
+  Color accent(HaState? s, {Color? preview}) {
     final explicit = parseHex(c.str('accent'));
     if (explicit != null) return explicit;
-    if (c.boolOr('follow_color', true) && s != null && s.isOn) {
-      final rgb = s.attributes['rgb_color'];
+    if (c.boolOr('follow_color', true)) {
+      if (preview != null) {
+        return readableTint([
+          (preview.r * 255).round(),
+          (preview.g * 255).round(),
+          (preview.b * 255).round(),
+        ]);
+      }
+      final rgb = s != null && s.isOn ? s.attributes['rgb_color'] : null;
       if (rgb is List && rgb.length >= 3 && rgb.every((x) => x is num)) {
         return readableTint(rgb.cast<num>());
       }

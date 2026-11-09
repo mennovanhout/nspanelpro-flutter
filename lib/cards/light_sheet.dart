@@ -367,7 +367,7 @@ class _LightSheetState extends State<LightSheet> {
         SheetAction(
           label: on ? 'Turn off' : 'Turn on',
           icon: Icons.power_settings_new,
-          primary: true,
+          primary: on,
           close: false,
           enabled: available && !_busy && _drag == null,
           dimWhenDisabled: !available,
@@ -571,7 +571,10 @@ class _LightSheetState extends State<LightSheet> {
           : status,
       stateColor: _error != null ? Ns.danger : Ns.muted,
       value: values[LightChannel.brightness]!,
-      accent: accent,
+      accent: controls.accent(
+        s,
+        preview: (p.caps.color || p.white) ? target : null,
+      ),
       fromTop: false,
       step: widget.config.numOr('step', 5),
       showLevel: p.caps.brightness,
