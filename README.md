@@ -113,6 +113,13 @@ video decoder runs on this hardware; Home Assistant scales the still. With the *
 switch and the **Page** number of the panel's device, a doorbell automation can wake the
 panel, turn to the camera page and ring - the cards README has the automation.
 
+`style: pro` on `custom:nspanel-weather-card` draws a full-screen weather page: a big
+temperature over a gradient per condition, with the forecast along the bottom. It is native
+only; a browser ignores the key and draws the normal card. For pictures instead of gradients,
+set `background_url` to a folder Home Assistant serves, such as `/local/weather`, holding your
+own `Sunny.png`, `Cloud.png`, `Rain.png`, `Snow.png`, `Thunder.png` and `Star.png`. No artwork
+ships with the app. `height` defaults to 480 and `radius` to 0.
+
 The alarm card is the one with a keypad: when the alarm wants a code, arming or disarming
 opens one full screen, and a refused code says so and clears. It rings the built-in
 `armed`, `disarmed` and `alarm` sounds as the state changes (`sounds: false` to stop it).
