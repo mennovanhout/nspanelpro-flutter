@@ -24,6 +24,7 @@ class ScreensaverConfig {
     this.sleep = false,
     this.sleepAfterSeconds = 0,
     this.wakeOnProximity = true,
+    this.keepAwakeOnProximity = false,
     this.proximityDelta = 12,
     this.proximityBelow,
     this.proximityAbove,
@@ -81,6 +82,7 @@ class ScreensaverConfig {
   /// [proximityBelow] / [proximityAbove] are absolute overrides for people who
   /// have watched the readout and know.
   final bool wakeOnProximity;
+  final bool keepAwakeOnProximity;
   final double proximityDelta;
   final double? proximityBelow;
   final double? proximityAbove;
@@ -116,6 +118,7 @@ class ScreensaverConfig {
     wakeOnProximity: m['wake_on_proximity'] is bool
         ? m['wake_on_proximity'] as bool
         : true,
+    keepAwakeOnProximity: m['keep_awake_on_proximity'] == true,
     proximityDelta: (m['proximity_delta'] as num?)?.toDouble() ?? 12,
     proximityBelow: (m['proximity_below'] as num?)?.toDouble(),
     proximityAbove: (m['proximity_above'] as num?)?.toDouble(),
@@ -145,6 +148,7 @@ class ScreensaverConfig {
           (o['sleep_after'] as num?)?.toInt().clamp(0, 86400) ??
           sleepAfterSeconds,
       wakeOnProximity: wakeOnProximity,
+      keepAwakeOnProximity: keepAwakeOnProximity,
       proximityDelta:
           (o['proximity_delta'] as num?)?.toDouble().clamp(1, 1000) ??
           proximityDelta,
