@@ -97,7 +97,11 @@ class StatusCard extends StatelessWidget {
               name: item.str('name') ?? friendlyName(s, id),
               sub: _label(item, s),
               alert: bad,
-              accent: accent,
+              // to tell a leak from a window left open; only while it is a
+              // problem, so a normal tile stays quiet
+              accent: parseHex(item.str('color')) ?? accent,
+              background: parseHex(item.str('background')),
+              colorName: parseHex(item.str('color')) != null,
               compact: columns == 3,
             ),
           );

@@ -285,6 +285,13 @@ turns auto off, like a phone. A panel that never sees the sun wants a lower dayl
 so it still reaches its maximum. The same keys go under `brightness` in `setup.json`:
 `{ "auto": true, "min": 20, "max": 255, "daylight_lux": 500 }`.
 
+**Text size.** A panel across the room can be hard to read. **Text size** on the device page
+scales the text on every card, sheet and keypad from 80% to 140%, and changes as you move it.
+It is also on the setup screen, for a panel without MQTT, and `"text_size": 120` in
+`setup.json` sets it from a file. Small text grows the most and big numbers stay as they are.
+At 140% a card can need about 20 px more `height`. The screensaver has `clock_size` of its own
+and is left alone.
+
 **Sleep.** With `sleep: true` the screensaver turns the LCD backlight fully off - not the
 "Screen brightness" entity's 0, which on this panel is the driver's floor of 10/255 and still
 glows in a dark room - and turns it back on for anything that wakes the screensaver: someone
@@ -438,6 +445,7 @@ Give the app your MQTT broker and it registers itself through MQTT discovery: on
 | `update` App | the installed and latest version, release notes, and Install (see Updating) |
 | `number` Idle timeout, `switch` Sleep, `number` Sleep after, `number` Wake sensitivity | the screensaver's `after`, `sleep`, `sleep_after` and `proximity_delta`, changeable from HA (see Panel settings) |
 | `switch` Auto brightness, `number` minimum / maximum / daylight | the screen follows the light sensor (see Panel settings) |
+| `number` Text size | 80-140%, everything but the screensaver (see Panel settings) |
 | `button` Use dashboard settings | drops every override; the dashboard card is the config again |
 | `button` Stop audio | |
 | Wi-Fi signal, SoC temperature, slow frames, app version, last touch | diagnostics |

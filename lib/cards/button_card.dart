@@ -136,10 +136,16 @@ class _ButtonCardState extends State<ButtonCard> {
     }
     b.armed = false;
     _fire(b.item);
+    // 0 is no tick at all, for a switch that answers with its own state.
+    final ms = b.item.intOr('feedback_ms', c.intOr('feedback_ms', 1200));
+    if (ms <= 0) {
+      setState(() {});
+      return;
+    }
     setState(() => b.fired = true);
     _later(() {
       if (mounted) setState(() => b.fired = false);
-    }, c.intOr('feedback_ms', 1200));
+    }, ms);
   }
 
   @override

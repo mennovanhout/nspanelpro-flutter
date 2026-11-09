@@ -35,6 +35,18 @@ class _MediaCardState extends State<MediaCard> with EchoMixin {
   Future<void> _call(String service, [Map<String, dynamic>? data]) =>
       widget.env.conn.callService('media_player', service, {'entity_id': entity, ...?data});
 
+  /// `tap` and `long_press` take play_pause, sheet, more_info or none. HA's
+  /// more-info dialog is a browser thing, so here more_info is the same sheet.
+  VoidCallback? _action(String action, HaState? s) => switch (action) {
+    'none' => null,
+    'play_pause' => () => _call('media_play_pause'),
+    'sheet' || 'more_info' => () => _openSheet(s),
+    _ => null,
+  };
+
+  String get _tap =>
+      c.str('tap') ?? (c.boolOr('more_info', false) ? 'sheet' : 'play_pause');
+
   bool _idle(HaState? s) => s == null || const {'off', 'idle', 'standby'}.contains(s.state);
   bool _playing(HaState? s) => s?.state == 'playing';
 
@@ -185,8 +197,8 @@ class _MediaCardState extends State<MediaCard> with EchoMixin {
           chips2: c.boolOr('show_presets', true)
               ? [for (final p in presets.take(4)) ChipSpec(label: p.str('name') ?? '', onTap: () => _applyPreset(p))]
               : const [],
-          onTap: () => _call('media_play_pause'),
-          onLongPress: c.str('long_press') == 'none' ? null : () => _openSheet(s),
+          onTap: _action(_tap, s),
+          onLongPress: _action(c.str('long_press') ?? 'sheet', s),
           onDragValue: (nv) {
             dragging = true;
             setLocal(nv);

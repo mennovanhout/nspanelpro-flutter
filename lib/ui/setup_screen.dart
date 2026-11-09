@@ -35,12 +35,15 @@ class _SetupScreenState extends State<SetupScreen> {
     text: widget.initial?.name ?? 'NSPanel',
   );
   late final _mqttHost = TextEditingController(
-    text: widget.initial?.mqttHost ?? '',
+    text: widget.initial?.mqttAddress ?? '',
   );
   late final _mqttUser = TextEditingController(
     text: widget.initial?.mqttUser ?? '',
   );
   final _mqttPass = TextEditingController();
+  late final _textSize = TextEditingController(
+    text: '${widget.initial?.textSize ?? 100}',
+  );
   final _token = TextEditingController();
   String? _err;
 
@@ -59,6 +62,7 @@ class _SetupScreenState extends State<SetupScreen> {
       _mqttHost,
       _mqttUser,
       _mqttPass,
+      _textSize,
       _token,
     ]) {
       c.dispose();
@@ -100,6 +104,9 @@ class _SetupScreenState extends State<SetupScreen> {
       feedback: widget.initial?.feedback,
       overrides: widget.initial?.overrides,
       brightness: widget.initial?.brightness,
+      textSize: int.tryParse(_textSize.text.trim()) ??
+          widget.initial?.textSize ??
+          100,
     );
     s.save().then((_) => widget.onSaved(s));
   }
@@ -214,6 +221,17 @@ class _SetupScreenState extends State<SetupScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Text size in % (${Settings.minTextSize}-${Settings.maxTextSize})',
+              style: TextStyle(color: Ns.muted, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            TextField(
+              controller: _textSize,
+              keyboardType: TextInputType.number,
+              decoration: field.copyWith(hintText: '100'),
             ),
             const SizedBox(height: 10),
             SizedBox(

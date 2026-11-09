@@ -20,7 +20,10 @@ class Settings {
     this.feedback,
     this.overrides,
     this.brightness,
-  });
+    int textSize = 100,
+  }) {
+    this.textSize = textSize;
+  }
 
   String url;
   String token;
@@ -79,6 +82,17 @@ class Settings {
       : mqtt!['password'].toString();
   bool get hasMqtt => mqttHost.isNotEmpty;
 
+  /// As the setup screen shows it. The port has to be in there, because that
+  /// one field is all the screen saves.
+  String get mqttAddress =>
+      mqttPort == 1883 ? mqttHost : '$mqttHost:$mqttPort';
+
+  /// Everything but the screensaver's text, in percent of the normal size.
+  int get textSize => _textSize;
+  set textSize(int v) => _textSize = v.clamp(minTextSize, maxTextSize);
+  int _textSize = 100;
+  static const minTextSize = 80, maxTextSize = 140;
+
   /// Lovelace url_path of the dashboard to render; empty = the default one.
   String dashboard;
 
@@ -97,6 +111,7 @@ class Settings {
   static const _kFeedback = 'feedback';
   static const _kOverrides = 'overrides';
   static const _kBrightness = 'brightness';
+  static const _kTextSize = 'text_size';
 
   static Map<String, dynamic>? _map(SharedPreferences p, String key) {
     final raw = p.getString(key);
@@ -164,6 +179,8 @@ class Settings {
                   ? (j['brightness'] as Map).cast<String, dynamic>()
                   : null)
             : current?.brightness,
+        textSize:
+            (j['text_size'] as num?)?.toInt() ?? current?.textSize ?? 100,
       );
       await s.save();
       return true;
@@ -192,6 +209,7 @@ class Settings {
       feedback: _map(p, _kFeedback),
       overrides: _map(p, _kOverrides),
       brightness: _map(p, _kBrightness),
+      textSize: p.getInt(_kTextSize) ?? 100,
     );
   }
 
@@ -202,6 +220,7 @@ class Settings {
     await p.setString(_kDash, dashboard);
     await p.setString(_kName, name);
     await p.setString(_kTts, ttsEngine);
+    await p.setInt(_kTextSize, textSize);
     final maps = {
       _kSaver: screensaver,
       _kMqtt: mqtt,
@@ -233,6 +252,7 @@ class Settings {
     await p.remove(_kSaver);
     await p.remove(_kMqtt);
     await p.remove(_kName);
+    await p.remove(_kTextSize);
     await p.remove(_kTts);
     await p.remove(_kOverrides);
     await p.remove(_kBrightness);

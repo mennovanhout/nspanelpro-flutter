@@ -20,7 +20,7 @@ Future<void> showKeypadSheet(
     context: context,
     barrierDismissible: true,
     barrierLabel: 'close',
-    barrierColor: Ns.ground.withValues(alpha: .72),
+    barrierColor: Ns.ground.withValues(alpha: .92),
     transitionDuration: const Duration(milliseconds: 180),
     transitionBuilder: (_, a, _, child) {
       final curved = CurvedAnimation(parent: a, curve: Curves.easeOutCubic);

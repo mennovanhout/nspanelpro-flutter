@@ -71,6 +71,10 @@ sounds, TTS through HA, self-update from GitHub Releases, start on boot.
   draw a throwing widget as a plain gray box and log nothing visible. Reproduce it in a widget
   test inside a `Column`, as a page is, and assert `tester.takeException()` is null (see
   `status_widget_test.dart`: an unstretched `TileGrid` row once forced an infinite height).
+- **Text size is a `PanelTextScaler` above the navigator** (`text_size`, 80-140%, panel-only
+  like auto brightness). It tapers, so big numbers do not grow, and it sits inside
+  `DisplayOverlay` so the screensaver keeps its own `clock_size`. New fixed-height layouts belong
+  in the "largest text size" group of `test/issue_fixes_test.dart`.
 - **Tests run against fakes, not the house.** `test/connection_test.dart` has `FakeHa` (the
   websocket, including a refused alarm code), `test/mqtt_client_test.dart` a fake broker,
   `test/adb_test.dart` a fake adbd. A widget test of a flow (see `alarm_widget_test.dart`)

@@ -223,6 +223,8 @@ class _AlarmCardState extends State<AlarmCard> {
                       ? const SizedBox()
                       : disarmed
                           ? Row(
+                              // without this each button shrinks to its label
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 for (final m in modes) ...[
                                   if (m != modes.first) const SizedBox(width: 10),

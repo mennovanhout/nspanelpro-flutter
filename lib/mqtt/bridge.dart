@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../config/settings.dart';
 import 'client.dart';
 
 /// The panel as a Home Assistant device, over MQTT discovery.
@@ -73,6 +74,7 @@ class PanelBridge {
     'brightness_min',
     'brightness_max',
     'brightness_daylight',
+    'text_size',
   ];
 
   String get base => 'nspanel/$deviceId';
@@ -233,6 +235,16 @@ class PanelBridge {
         'mode': 'box',
         'unit_of_measurement': 's',
         'icon': 'mdi:weather-night',
+        ...conf,
+      }, command: true),
+      'number/$deviceId/text_size': e('text_size', {
+        'name': 'Text size',
+        'min': Settings.minTextSize,
+        'max': Settings.maxTextSize,
+        'step': 5,
+        'mode': 'slider',
+        'unit_of_measurement': '%',
+        'icon': 'mdi:format-size',
         ...conf,
       }, command: true),
       'number/$deviceId/proximity_delta': e('proximity_delta', {

@@ -32,6 +32,7 @@ Future<void> showControlSheet(
   required Color accent,
   bool fromTop = false,
   double step = 5,
+  String Function(double)? format,
   List<SheetAction> actions = const [],
   ValueChanged<double>? onInput,
   ValueChanged<double>? onCommit,
@@ -45,6 +46,7 @@ Future<void> showControlSheet(
       accent: accent,
       fromTop: fromTop,
       step: step,
+      format: format,
       actions: actions,
       onInput: onInput,
       onCommit: onCommit,
@@ -82,10 +84,13 @@ class ControlSheet extends StatefulWidget {
     required this.fromTop,
     required this.step,
     required this.actions,
+    this.format,
     this.onInput,
     this.onCommit,
   });
 
+  /// What the slider reads, from its 0..1 value; a percentage without one.
+  final String Function(double)? format;
   final bool showLevel, enabled;
   final String title, state;
   final double value, step;
@@ -263,7 +268,8 @@ class _SheetState extends State<ControlSheet> {
                                         ),
                                         Center(
                                           child: Text(
-                                            '${(_v * 100).round()}%',
+                                            widget.format?.call(_v) ??
+                                                '${(_v * 100).round()}%',
                                             style: const TextStyle(
                                               color: Ns.text,
                                               fontSize: 44,

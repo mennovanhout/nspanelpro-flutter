@@ -65,6 +65,10 @@ class DisplaySession {
 
   /// Shown with the screensaver clock; null for none.
   final saverWeather = ValueNotifier<Widget?>(null);
+
+  /// 1 is the normal size. Set by the dashboard, which has the settings; used
+  /// by the app root, which does not.
+  final textScale = ValueNotifier<double>(1);
   StreamSubscription<dynamic>? _events;
   StreamSubscription<double>? _sensor;
   ProximityPresence? _presence;
@@ -132,5 +136,6 @@ class DisplaySession {
     controller.removeListener(_changed);
     controller.dispose();
     saverWeather.dispose();
+    textScale.dispose();
   }
 }

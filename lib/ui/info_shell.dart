@@ -141,12 +141,20 @@ class Tile extends StatelessWidget {
     this.alert = false,
     this.accent = Ns.gold,
     this.compact = false,
+    this.background,
+    this.colorName = false,
     this.onTap,
   });
 
   final IconData icon;
   final String name, sub;
   final bool alert, compact;
+
+  /// While [alert]: the whole tile instead of a tint of [accent].
+  final Color? background;
+
+  /// While [alert]: the name in [accent] too, for a tile with its own colour.
+  final bool colorName;
   final Color accent;
   final VoidCallback? onTap;
 
@@ -159,7 +167,7 @@ class Tile extends StatelessWidget {
       padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 12),
       decoration: BoxDecoration(
         color: alert
-            ? accent.withValues(alpha: .16)
+            ? (background ?? accent.withValues(alpha: .16))
             : Colors.white.withValues(alpha: .06),
         borderRadius: BorderRadius.circular(14),
       ),
@@ -177,7 +185,7 @@ class Tile extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Ns.text,
+                    color: alert && colorName ? accent : Ns.text,
                     fontSize: compact ? 14 : 15,
                     fontWeight: FontWeight.w600,
                     height: 1.2,

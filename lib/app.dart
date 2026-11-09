@@ -13,6 +13,7 @@ import 'mqtt/client.dart';
 import 'util/auto_brightness.dart';
 import 'util/device.dart';
 import 'util/display_session.dart';
+import 'util/text_scale.dart';
 import 'util/frames.dart';
 import 'config/dashboard.dart';
 import 'config/screensaver.dart';
@@ -33,7 +34,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.7.2';
+const appVersion = '0.8.0';
 
 class NsPanelApp extends StatefulWidget {
   const NsPanelApp({super.key});
@@ -58,7 +59,23 @@ class _NsPanelAppState extends State<NsPanelApp> {
     builder: (context, child) => DisplayOverlay(
       controller: _display.controller,
       weather: _display.saverWeather,
-      child: child!,
+      // Inside the overlay, so the screensaver keeps its own `clock_size`. The
+      // MediaQuery is always there: taking it out would rebuild the navigator.
+      child: ValueListenableBuilder<double>(
+        valueListenable: _display.textScale,
+        child: child,
+        builder: (context, scale, child) {
+          final media = MediaQuery.of(context);
+          return MediaQuery(
+            data: media.copyWith(
+              textScaler: scale == 1
+                  ? media.textScaler
+                  : PanelTextScaler(scale),
+            ),
+            child: child!,
+          );
+        },
+      ),
     ),
   );
 }
@@ -189,6 +206,7 @@ class _DashboardState extends State<Dashboard> {
   bool get _saving => widget.display.controller.saving;
 
   void _configureDisplay() {
+    widget.display.textScale.value = widget.settings.textSize / 100;
     final s = _saver;
     // The overlay sits above the navigator, where there is no connection to
     // HA; the dashboard hands it the finished widget.
@@ -446,6 +464,7 @@ class _DashboardState extends State<Dashboard> {
     b.setting('brightness_min', st.brightnessMin.toString());
     b.setting('brightness_max', st.brightnessMax.toString());
     b.setting('brightness_daylight', st.brightnessDaylight.round().toString());
+    b.setting('text_size', st.textSize.toString());
   }
 
   Future<void> _onSetting(String object, String value) async {
@@ -463,6 +482,8 @@ class _DashboardState extends State<Dashboard> {
         st.overrides = {...?st.overrides, 'sleep_after': n.round()};
       case 'proximity_delta' when n != null:
         st.overrides = {...?st.overrides, 'proximity_delta': n.toDouble()};
+      case 'text_size' when n != null:
+        st.textSize = n.round();
       case 'auto_brightness':
         st.brightness = {...?st.brightness, 'auto': on};
         _follower.reset();

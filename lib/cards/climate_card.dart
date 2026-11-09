@@ -126,6 +126,7 @@ class _ClimateCardState extends State<ClimateCard> with EchoMixin {
       value: display(_entityValue(s)),
       accent: parseHex(c.str('accent')) ?? Ns.ember,
       step: step / (r.max - r.min) * 100,
+      format: (v) => '${fmt(_degrees(v, s), 1)}°',
       actions: [
         for (final m in modes)
           SheetAction(
