@@ -1,0 +1,304 @@
+[
+  {
+    "name": "onoff",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "onoff"
+        ],
+        "brightness": 180
+      }
+    },
+    "available": true,
+    "brightness": false,
+    "color": false,
+    "temperature": false
+  },
+  {
+    "name": "missing modes",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "brightness": 180
+      }
+    },
+    "available": true,
+    "brightness": false,
+    "color": false,
+    "temperature": false
+  },
+  {
+    "name": "empty modes",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": []
+      }
+    },
+    "available": true,
+    "brightness": false,
+    "color": false,
+    "temperature": false
+  },
+  {
+    "name": "unknown mode",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "future_mode"
+        ]
+      }
+    },
+    "available": true,
+    "brightness": false,
+    "color": false,
+    "temperature": false
+  },
+  {
+    "name": "malformed modes",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": "rgb"
+      }
+    },
+    "available": true,
+    "brightness": false,
+    "color": false,
+    "temperature": false
+  },
+  {
+    "name": "contradictory onoff",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "onoff",
+          "rgb"
+        ]
+      }
+    },
+    "available": true,
+    "brightness": false,
+    "color": false,
+    "temperature": false
+  },
+  {
+    "name": "brightness",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "brightness"
+        ]
+      }
+    },
+    "available": true,
+    "brightness": true,
+    "color": false,
+    "temperature": false
+  },
+  {
+    "name": "color_temp",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "color_temp"
+        ]
+      }
+    },
+    "available": true,
+    "brightness": true,
+    "color": false,
+    "temperature": true
+  },
+  {
+    "name": "hs",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "hs"
+        ]
+      }
+    },
+    "available": true,
+    "brightness": true,
+    "color": true,
+    "temperature": true
+  },
+  {
+    "name": "xy",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "xy"
+        ]
+      }
+    },
+    "available": true,
+    "brightness": true,
+    "color": true,
+    "temperature": true
+  },
+  {
+    "name": "rgb",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "rgb"
+        ]
+      }
+    },
+    "available": true,
+    "brightness": true,
+    "color": true,
+    "temperature": true
+  },
+  {
+    "name": "rgbw",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "rgbw"
+        ]
+      }
+    },
+    "available": true,
+    "brightness": true,
+    "color": true,
+    "temperature": true
+  },
+  {
+    "name": "rgbww",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "rgbww"
+        ]
+      }
+    },
+    "available": true,
+    "brightness": true,
+    "color": true,
+    "temperature": true
+  },
+  {
+    "name": "white",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "white"
+        ]
+      }
+    },
+    "available": true,
+    "brightness": true,
+    "color": false,
+    "temperature": false
+  },
+  {
+    "name": "off without brightness",
+    "state": {
+      "entity_id": "light.test",
+      "state": "off",
+      "attributes": {
+        "supported_color_modes": [
+          "brightness"
+        ]
+      }
+    },
+    "available": true,
+    "brightness": true,
+    "color": false,
+    "temperature": false
+  },
+  {
+    "name": "off with stale onoff mode",
+    "state": {
+      "entity_id": "light.test",
+      "state": "off",
+      "attributes": {
+        "supported_color_modes": [
+          "rgb"
+        ],
+        "color_mode": "onoff"
+      }
+    },
+    "available": true,
+    "brightness": true,
+    "color": true,
+    "temperature": true
+  },
+  {
+    "name": "onoff effect",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "rgb"
+        ],
+        "color_mode": "onoff"
+      }
+    },
+    "available": true,
+    "brightness": false,
+    "color": false,
+    "temperature": false
+  },
+  {
+    "name": "unavailable",
+    "state": {
+      "entity_id": "light.test",
+      "state": "unavailable",
+      "attributes": {
+        "supported_color_modes": [
+          "brightness"
+        ]
+      }
+    },
+    "available": false,
+    "brightness": true,
+    "color": false,
+    "temperature": false
+  },
+  {
+    "name": "unknown",
+    "state": {
+      "entity_id": "light.test",
+      "state": "unknown",
+      "attributes": {
+        "supported_color_modes": [
+          "brightness"
+        ]
+      }
+    },
+    "available": false,
+    "brightness": true,
+    "color": false,
+    "temperature": false
+  }
+]

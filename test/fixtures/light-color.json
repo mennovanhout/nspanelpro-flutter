@@ -1,0 +1,331 @@
+[
+  {
+    "name": "relay",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "onoff"
+        ]
+      }
+    },
+    "white": false,
+    "color": false,
+    "range": null,
+    "values": {}
+  },
+  {
+    "name": "dimmer",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "brightness"
+        ],
+        "brightness": 127.5
+      }
+    },
+    "white": false,
+    "color": false,
+    "range": null,
+    "values": {
+      "brightness": 0.5
+    }
+  },
+  {
+    "name": "TW Kelvin bounds",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "color_temp"
+        ],
+        "min_color_temp_kelvin": 2000,
+        "max_color_temp_kelvin": 6500,
+        "color_temp_kelvin": 1000
+      }
+    },
+    "white": true,
+    "color": false,
+    "range": [
+      2000,
+      6500
+    ],
+    "values": {
+      "temperature": 0
+    }
+  },
+  {
+    "name": "TW legacy mireds",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "color_temp"
+        ],
+        "min_mireds": 153.8,
+        "max_mireds": 500
+      }
+    },
+    "white": true,
+    "color": false,
+    "range": [
+      2000,
+      6501
+    ],
+    "values": {}
+  },
+  {
+    "name": "TW invalid range",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "color_temp"
+        ],
+        "min_color_temp_kelvin": 6500,
+        "max_color_temp_kelvin": 2000
+      }
+    },
+    "white": false,
+    "color": false,
+    "range": null,
+    "values": {}
+  },
+  {
+    "name": "TW missing range",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "color_temp"
+        ]
+      }
+    },
+    "white": false,
+    "color": false,
+    "range": null,
+    "values": {}
+  },
+  {
+    "name": "TW fixed range",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "color_temp"
+        ],
+        "min_color_temp_kelvin": 3000,
+        "max_color_temp_kelvin": 3000
+      }
+    },
+    "white": false,
+    "color": false,
+    "range": null,
+    "values": {}
+  },
+  {
+    "name": "rgb HS contract",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "rgb"
+        ],
+        "hs_color": [
+          180,
+          40
+        ]
+      }
+    },
+    "white": false,
+    "color": true,
+    "range": null,
+    "values": {
+      "hue": 0.5,
+      "saturation": 0.4
+    }
+  },
+  {
+    "name": "rgbw HS contract",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "rgbw"
+        ],
+        "hs_color": [
+          180,
+          40
+        ]
+      }
+    },
+    "white": false,
+    "color": true,
+    "range": null,
+    "values": {
+      "hue": 0.5,
+      "saturation": 0.4
+    }
+  },
+  {
+    "name": "hs HS contract",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "hs"
+        ],
+        "hs_color": [
+          180,
+          40
+        ]
+      }
+    },
+    "white": false,
+    "color": true,
+    "range": null,
+    "values": {
+      "hue": 0.5,
+      "saturation": 0.4
+    }
+  },
+  {
+    "name": "xy HS contract",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "xy"
+        ],
+        "hs_color": [
+          180,
+          40
+        ]
+      }
+    },
+    "white": false,
+    "color": true,
+    "range": null,
+    "values": {
+      "hue": 0.5,
+      "saturation": 0.4
+    }
+  },
+  {
+    "name": "rgbww combines both controls",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "rgbww"
+        ],
+        "min_color_temp_kelvin": 2000,
+        "max_color_temp_kelvin": 6500
+      }
+    },
+    "white": true,
+    "color": true,
+    "range": [
+      2000,
+      6500
+    ],
+    "values": {}
+  },
+  {
+    "name": "RGB fallback",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "rgb"
+        ],
+        "rgb_color": [
+          0,
+          255,
+          0
+        ]
+      }
+    },
+    "white": false,
+    "color": true,
+    "range": null,
+    "values": {
+      "hue": 0.3333333333333333,
+      "saturation": 1
+    }
+  },
+  {
+    "name": "HS wraps and clamps",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "hs"
+        ],
+        "hs_color": [
+          -180,
+          120
+        ]
+      }
+    },
+    "white": false,
+    "color": true,
+    "range": null,
+    "values": {
+      "hue": 0.5,
+      "saturation": 1
+    }
+  },
+  {
+    "name": "off preserves color controls",
+    "state": {
+      "entity_id": "light.test",
+      "state": "off",
+      "attributes": {
+        "supported_color_modes": [
+          "rgb"
+        ],
+        "color_mode": "brightness",
+        "brightness": 255
+      }
+    },
+    "white": false,
+    "color": true,
+    "range": null,
+    "values": {
+      "brightness": 0
+    }
+  },
+  {
+    "name": "active effect restricts color",
+    "state": {
+      "entity_id": "light.test",
+      "state": "on",
+      "attributes": {
+        "supported_color_modes": [
+          "rgb"
+        ],
+        "color_mode": "brightness"
+      }
+    },
+    "white": false,
+    "color": false,
+    "range": null,
+    "values": {}
+  }
+]

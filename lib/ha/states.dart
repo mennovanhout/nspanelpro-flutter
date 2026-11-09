@@ -1,14 +1,20 @@
 import 'package:flutter/foundation.dart';
 
+import 'light_memory.dart';
+
 /// One entity's state, as Home Assistant reports it.
 class HaState {
-  const HaState({required this.entityId, required this.state, required this.attributes});
+  const HaState({
+    required this.entityId,
+    required this.state,
+    required this.attributes,
+  });
 
   factory HaState.fromJson(Map<String, dynamic> j) => HaState(
-        entityId: j['entity_id'] as String,
-        state: (j['state'] ?? '').toString(),
-        attributes: (j['attributes'] as Map?)?.cast<String, dynamic>() ?? const {},
-      );
+    entityId: j['entity_id'] as String,
+    state: (j['state'] ?? '').toString(),
+    attributes: (j['attributes'] as Map?)?.cast<String, dynamic>() ?? const {},
+  );
 
   final String entityId;
   final String state;
@@ -27,7 +33,8 @@ class HaState {
   String? get deviceClass => attr<String>('device_class');
   bool get isBroken => state == 'unavailable' || state == 'unknown';
   bool get isOn => state == 'on';
-  int get supportedFeatures => (attributes['supported_features'] as num?)?.toInt() ?? 0;
+  int get supportedFeatures =>
+      (attributes['supported_features'] as num?)?.toInt() ?? 0;
   bool supports(int bit) => (supportedFeatures & bit) != 0;
   double? numAttr(String key) => (attributes[key] as num?)?.toDouble();
 }
@@ -48,6 +55,7 @@ String friendlyName(HaState? s, String entityId) {
 /// identity and every update is a new HaState, so a changed entity always
 /// notifies and an untouched one never does.
 class HaStates {
+  final LightMemory lightMemory = LightMemory();
   final Map<String, HaState> _all = {};
   final Map<String, ValueNotifier<HaState?>> _notifiers = {};
 
@@ -58,6 +66,9 @@ class HaStates {
       _notifiers.putIfAbsent(id, () => ValueNotifier<HaState?>(_all[id]));
 
   void replaceAll(Map<String, HaState> states) {
+    for (final state in states.values) {
+      lightMemory.observe(state.entityId, state.state, state.attributes);
+    }
     _all
       ..clear()
       ..addAll(states);
@@ -67,6 +78,7 @@ class HaStates {
   }
 
   void update(String id, HaState? s) {
+    lightMemory.observe(id, s?.state, s?.attributes);
     if (s == null) {
       _all.remove(id);
     } else {
