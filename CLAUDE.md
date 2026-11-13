@@ -5,7 +5,7 @@ working one.
 
 ## What this is
 
-A Flutter app (Flutter 3.47, Dart 3.13, Android API 24+) that runs on the Sonoff NSPanel Pro
+A Flutter app (Flutter 3.50, Dart 3.14, Android API 24+) that runs on the Sonoff NSPanel Pro
 86 - 480x480, PX30 with a Mali-G31, Android 8.1 - and renders the `custom:nspanel-*` cards
 from the user's Lovelace dashboard natively, read from Home Assistant over the websocket.
 The cards themselves, their options and their documentation live in the sibling repo

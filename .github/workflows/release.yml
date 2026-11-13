@@ -24,10 +24,7 @@ jobs:
           java-version: "17"
       - uses: subosito/flutter-action@v2
         with:
-          # pinned: a newer stable can refuse the project's Android Gradle
-          # Plugin, and a release must build with what was tested (3.50 did)
           channel: stable
-          flutter-version: 3.47.9
           cache: true
 
       - name: Signing key
