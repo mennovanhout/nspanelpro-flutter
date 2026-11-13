@@ -75,6 +75,12 @@ sounds, TTS through HA, self-update from GitHub Releases, start on boot.
   like auto brightness). It tapers, so big numbers do not grow, and it sits inside
   `DisplayOverlay` so the screensaver keeps its own `clock_size`. New fixed-height layouts belong
   in the "largest text size" group of `test/issue_fixes_test.dart`.
+- **Every word on screen comes from `lib/l10n/strings.dart`** (en/nl/de side by side), read
+  with `L.of(context)` inside a build so a language change rebuilds it; without an `L` above
+  (most widget tests) it is English. `L` sits above the navigator and the screensaver overlay,
+  fed by `DisplaySession.strings`. The language is the panel's `language` setting (MQTT
+  select, setup.json), else HA's (`followHaLanguage`: profile, then system), else English.
+  New card text goes in the table, and the cards repo's `I18N` table uses the same words.
 - **Tests run against fakes, not the house.** `test/connection_test.dart` has `FakeHa` (the
   websocket, including a refused alarm code), `test/mqtt_client_test.dart` a fake broker,
   `test/adb_test.dart` a fake adbd. A widget test of a flow (see `alarm_widget_test.dart`)

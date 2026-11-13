@@ -6,6 +6,7 @@ import '../ha/states.dart';
 import '../util/fmt.dart';
 import '../util/icons.dart';
 import '../util/weather.dart';
+import '../l10n/strings.dart';
 
 /// The weather under the screensaver clock: the condition and the
 /// temperature now, and - when [forecast] - today's high and low and the
@@ -81,6 +82,7 @@ class _SaverWeatherState extends State<SaverWeather> {
 
   @override
   Widget build(BuildContext context) {
+    final t = L.of(context);
     final k = widget.size / 64;
     const shadow = [
       Shadow(offset: Offset(0, 1), blurRadius: 4, color: Color(0x80000000)),
@@ -112,7 +114,7 @@ class _SaverWeatherState extends State<SaverWeather> {
             second.add('${fmt(hi, 0)}°');
           }
           final rain = rainOf(today, unit: rainUnit);
-          if (rain != null && rain.wet) second.add('${rain.text} rain');
+          if (rain != null && rain.wet) second.add(t.rainLine(rain.text));
         }
 
         return Column(
@@ -134,7 +136,7 @@ class _SaverWeatherState extends State<SaverWeather> {
                     [
                       if (temp != null)
                         '${fmt(temp, 0)}${unit.startsWith('°') ? '°' : ' $unit'}',
-                      conditionLabel(s.state),
+                      t.condition(s.state),
                     ].join('  '),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

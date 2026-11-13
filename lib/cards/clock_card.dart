@@ -8,13 +8,9 @@ import '../ui/fill_card.dart';
 import '../ui/info_shell.dart';
 import '../ui/theme.dart';
 import '../util/color.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 
-const _months = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
-];
-const _days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 /// Time, date, and an optional line from any entity. One timer, re-armed
 /// against the wall clock each tick so it cannot drift.
@@ -97,7 +93,7 @@ class _ClockCardState extends State<ClockCard> {
             ),
             if (c.boolOr('show_date', true)) ...[
               const SizedBox(height: 10),
-              Text('${_days[_now.weekday - 1]} ${_now.day} ${_months[_now.month - 1]}',
+              Text(L.of(context).longDate(_now),
                   style: const TextStyle(color: Ns.muted, fontSize: 20, fontWeight: FontWeight.w600)),
             ],
             if (line.isNotEmpty) ...[

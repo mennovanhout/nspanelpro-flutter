@@ -10,6 +10,7 @@ import '../config/dashboard.dart';
 import '../ha/states.dart';
 import '../ui/page_scope.dart';
 import '../ui/theme.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 
 /// One still from a camera: the entity, and the size it will be shown at.
@@ -40,6 +41,8 @@ class CameraCard extends StatefulWidget {
 }
 
 class _CameraCardState extends State<CameraCard> {
+  Strings get tr => L.of(context);
+
   CardConfig get c => widget.config;
   String get _entity => c.str('entity') ?? '';
 
@@ -178,10 +181,10 @@ class _CameraCardState extends State<CameraCard> {
                       const SizedBox(height: 8),
                       Text(
                         gone
-                            ? 'Camera unavailable'
+                            ? tr.cameraUnavailable
                             : _fails >= 3
-                                ? 'No picture'
-                                : 'Loading…',
+                                ? tr.noPicture
+                                : tr.loading,
                         style: const TextStyle(color: Ns.muted, fontSize: 15),
                       ),
                     ],

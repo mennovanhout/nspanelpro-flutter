@@ -5,6 +5,7 @@ import '../ha/states.dart';
 import '../ui/sheet.dart';
 import '../ui/theme.dart';
 import '../util/color.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 
 /// A deliberately small native counterpart to HA's more-info dialog.
@@ -19,6 +20,8 @@ class SwitchSheet extends StatefulWidget {
 }
 
 class _SwitchSheetState extends State<SwitchSheet> {
+  Strings get tr => L.of(context);
+
   bool _busy = false;
   bool _failed = false;
   String get entity => widget.config.str('entity') ?? '';
@@ -59,15 +62,15 @@ class _SwitchSheetState extends State<SwitchSheet> {
       final available = s != null && s.state != 'unavailable';
       final on = s?.isOn ?? false;
       final state = !available
-          ? 'Unavailable'
+          ? tr.unavailable
           : _controllable
           ? (on
-                ? widget.config.str('on_text') ?? 'On'
-                : widget.config.str('off_text') ?? 'Off')
-          : s.state;
+                ? widget.config.str('on_text') ?? tr.on
+                : widget.config.str('off_text') ?? tr.off)
+          : tr.state(s.state);
       return ControlSheet(
         title: widget.config.titleOr(friendlyName(s, entity)),
-        state: _failed ? '$state · Command failed' : state,
+        state: _failed ? '$state · ${tr.commandFailed}' : state,
         value: 0,
         accent: parseHex(widget.config.str('accent')) ?? Ns.amber,
         showLevel: false,
@@ -77,7 +80,7 @@ class _SwitchSheetState extends State<SwitchSheet> {
         actions: [
           if (_controllable)
             SheetAction(
-              label: on ? 'Turn off' : 'Turn on',
+              label: on ? tr.turnOff : tr.turnOn,
               icon: Icons.power_settings_new,
               primary: true,
               close: false,

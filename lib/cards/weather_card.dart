@@ -10,9 +10,8 @@ import '../util/color.dart';
 import '../util/fmt.dart';
 import '../util/icons.dart';
 import '../util/weather.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
-
-const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /// Current conditions off the entity; the forecast over its own websocket
 /// subscription (HA 2024.4+), with the old attribute as a fallback. The
@@ -28,6 +27,8 @@ class WeatherCard extends StatefulWidget {
 }
 
 class _WeatherCardState extends State<WeatherCard> {
+  Strings get tr => L.of(context);
+
   CardConfig get c => widget.config;
   String get entity => c.str('entity') ?? '';
 
@@ -89,7 +90,7 @@ class _WeatherCardState extends State<WeatherCard> {
         final rainUnit = s?.attr<String>('precipitation_unit') ?? 'mm';
         final bits = <String>[];
         if (s != null && s.state.isNotEmpty) {
-          bits.add(conditionLabel(s.state));
+          bits.add(tr.condition(s.state));
         }
         final hum = s?.numAttr('humidity');
         if (hum != null) bits.add('${fmt(hum, 0)}%');
@@ -149,7 +150,7 @@ class _WeatherCardState extends State<WeatherCard> {
                     style: nameStyle,
                   ),
                   Text(
-                    broken ? 'Unavailable' : bits.join(' · '),
+                    broken ? tr.unavailable : bits.join(' · '),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: subStyle,
@@ -182,7 +183,7 @@ class _WeatherCardState extends State<WeatherCard> {
         ? ''
         : (hourly
               ? when.hour.toString().padLeft(2, '0')
-              : _days[when.weekday - 1]);
+              : tr.dayShort(when));
     final hi = m['temperature'] as num?;
     final lo = m['templow'] as num?;
     // the chance and the amount of rain, under the temperature

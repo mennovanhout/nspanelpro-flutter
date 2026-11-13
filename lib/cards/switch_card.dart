@@ -12,6 +12,7 @@ import '../ui/sheet.dart';
 import '../ui/theme.dart';
 import '../util/color.dart';
 import '../util/icons.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 import 'light_sheet.dart';
 import 'switch_sheet.dart';
@@ -60,6 +61,8 @@ class _Sw {
 }
 
 class _SwitchCardState extends State<SwitchCard> {
+  Strings get tr => L.of(context);
+
   CardConfig get c => widget.config;
   late List<_Sw> _sws = _items().map(_Sw.new).toList();
   final _timers = <Timer>[];
@@ -213,8 +216,8 @@ class _SwitchCardState extends State<SwitchCard> {
     final showName = flag('show_name');
     final showState = flag('show_state');
     final state = broken
-        ? 'Unavailable'
-        : (on ? c.str('on_text') ?? 'On' : c.str('off_text') ?? 'Off');
+        ? tr.unavailable
+        : (on ? c.str('on_text') ?? tr.on : c.str('off_text') ?? tr.off);
 
     final swap = sw.item.boolOr(
       'swap_press_actions',

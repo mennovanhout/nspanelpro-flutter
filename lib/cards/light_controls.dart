@@ -4,6 +4,7 @@ import '../config/dashboard.dart';
 import '../ha/states.dart';
 import '../ui/theme.dart';
 import '../util/color.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 import 'light_capabilities.dart';
 
@@ -17,14 +18,15 @@ class LightControls {
   HaState? get current => env.states.get(entity);
   LightCapabilities get capabilities => LightCapabilities(current);
 
-  List<CardConfig> get presets => c['presets'] is List
+  /// The config's presets, or the default three named in [t].
+  List<CardConfig> presets([Strings t = Strings.en]) => c['presets'] is List
       ? c.maps('presets')
       : !capabilities.brightness
       ? const []
-      : const [
-          {'name': 'Low', 'brightness_pct': 15},
-          {'name': 'Mid', 'brightness_pct': 50},
-          {'name': 'Full', 'brightness_pct': 100},
+      : [
+          {'name': t.lightLow, 'brightness_pct': 15},
+          {'name': t.lightMid, 'brightness_pct': 50},
+          {'name': t.lightFull, 'brightness_pct': 100},
         ];
 
   double entityValue(HaState? s) {

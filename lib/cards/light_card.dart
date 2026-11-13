@@ -7,6 +7,7 @@ import '../ui/fill_card.dart';
 import '../ui/sheet.dart';
 import '../util/icons.dart';
 import 'echo.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 import 'light_capabilities.dart';
 import 'light_controls.dart';
@@ -22,6 +23,8 @@ class LightCard extends StatefulWidget {
 }
 
 class _LightCardState extends State<LightCard> with EchoMixin {
+  Strings get tr => L.of(context);
+
   CardConfig get c => widget.config;
   String get entity => c.str('entity') ?? '';
   int get echoMs => c.intOr('echo_ms', 1500);
@@ -29,7 +32,7 @@ class _LightCardState extends State<LightCard> with EchoMixin {
   LightControls get controls => LightControls(c, widget.env);
   HaState? get current => controls.current;
   LightCapabilities get capabilities => controls.capabilities;
-  List<CardConfig> get presets => controls.presets;
+  List<CardConfig> get presets => controls.presets(tr);
 
   void _applyPreset(CardConfig p) {
     if (!capabilities.allowsPreset(current, p)) return;
@@ -90,8 +93,8 @@ class _LightCardState extends State<LightCard> with EchoMixin {
           value: on && caps.brightness ? ValueText('$pct', unit: '%') : null,
           title: c.titleOr(friendlyName(s, entity)),
           sub: broken
-              ? 'Unavailable'
-              : (on ? (caps.brightness ? 'On · $pct%' : 'On') : 'Off'),
+              ? tr.unavailable
+              : (on ? (caps.brightness ? '${tr.on} · $pct%' : tr.on) : tr.off),
           chips: showPresets
               ? [
                   for (final p in presets.take(4))

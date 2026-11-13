@@ -8,6 +8,7 @@ import '../ui/theme.dart';
 import '../util/color.dart';
 import '../util/fmt.dart';
 import '../util/icons.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 
 /// One reading, as large as the card allows. Optional range bar and severity.
@@ -54,7 +55,7 @@ class SensorCard extends StatelessWidget {
 
         final sec = secondary == null ? null : env.states.get(secondary!);
         final sub = broken
-            ? 'Unavailable'
+            ? L.of(context).unavailable
             : (sec != null ? '${friendlyName(sec, secondary!)} ${fmt(sec.numeric)}${sec.unit}' : '');
 
         return InfoShell(

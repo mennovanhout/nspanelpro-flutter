@@ -6,6 +6,7 @@ import 'package:material_design_icons_flutter/material_design_icons_flutter.dart
 
 import '../config/dashboard.dart';
 import '../ha/states.dart';
+import '../l10n/strings.dart';
 import '../ui/info_shell.dart';
 import '../ui/keypad.dart';
 import '../ui/theme.dart';
@@ -13,20 +14,20 @@ import '../util/color.dart';
 import '../util/icons.dart';
 import 'env.dart';
 
-/// An arm mode: its button label, the service, the supported_features bit
-/// the entity has to set for it to show, and its icon.
+/// An arm mode: the service, the supported_features bit the entity has to
+/// set for it to show, and its icon. Its button label is [Strings.alarmMode].
 class AlarmMode {
-  const AlarmMode(this.key, this.label, this.service, this.bit, this.icon);
-  final String key, label, service, icon;
+  const AlarmMode(this.key, this.service, this.bit, this.icon);
+  final String key, service, icon;
   final int bit;
 }
 
 const alarmModes = [
-  AlarmMode('home', 'Home', 'alarm_arm_home', 1, 'mdi:shield-home'),
-  AlarmMode('away', 'Away', 'alarm_arm_away', 2, 'mdi:shield-lock'),
-  AlarmMode('night', 'Night', 'alarm_arm_night', 4, 'mdi:shield-moon'),
-  AlarmMode('custom_bypass', 'Bypass', 'alarm_arm_custom_bypass', 16, 'mdi:shield-half-full'),
-  AlarmMode('vacation', 'Vacation', 'alarm_arm_vacation', 32, 'mdi:shield-airplane'),
+  AlarmMode('home', 'alarm_arm_home', 1, 'mdi:shield-home'),
+  AlarmMode('away', 'alarm_arm_away', 2, 'mdi:shield-lock'),
+  AlarmMode('night', 'alarm_arm_night', 4, 'mdi:shield-moon'),
+  AlarmMode('custom_bypass', 'alarm_arm_custom_bypass', 16, 'mdi:shield-half-full'),
+  AlarmMode('vacation', 'alarm_arm_vacation', 32, 'mdi:shield-airplane'),
 ];
 
 /// The modes to show: the config's list (default home, away), in its order,
@@ -55,17 +56,17 @@ class AlarmLook {
   final String icon;
 }
 
-AlarmLook alarmLook(String? state, Color accent) => switch (state) {
-      'disarmed' => AlarmLook('Disarmed', accent, 'mdi:shield-off-outline'),
-      'armed_home' => const AlarmLook('Armed home', Ns.danger, 'mdi:shield-home'),
-      'armed_away' => const AlarmLook('Armed away', Ns.danger, 'mdi:shield-lock'),
-      'armed_night' => const AlarmLook('Armed night', Ns.danger, 'mdi:shield-moon'),
-      'armed_vacation' => const AlarmLook('Armed vacation', Ns.danger, 'mdi:shield-airplane'),
-      'armed_custom_bypass' => const AlarmLook('Armed (bypass)', Ns.danger, 'mdi:shield-half-full'),
-      'arming' => const AlarmLook('Arming…', Ns.amber, 'mdi:shield-sync'),
-      'pending' => const AlarmLook('Pending…', Ns.amber, 'mdi:shield-alert'),
-      'triggered' => const AlarmLook('TRIGGERED', Ns.danger, 'mdi:bell-ring'),
-      _ => const AlarmLook('Unavailable', Ns.muted, 'mdi:alert-circle-outline'),
+AlarmLook alarmLook(String? state, Color accent, [Strings t = Strings.en]) => switch (state) {
+      'disarmed' => AlarmLook(t.disarmed, accent, 'mdi:shield-off-outline'),
+      'armed_home' => AlarmLook(t.armedHome, Ns.danger, 'mdi:shield-home'),
+      'armed_away' => AlarmLook(t.armedAway, Ns.danger, 'mdi:shield-lock'),
+      'armed_night' => AlarmLook(t.armedNight, Ns.danger, 'mdi:shield-moon'),
+      'armed_vacation' => AlarmLook(t.armedVacation, Ns.danger, 'mdi:shield-airplane'),
+      'armed_custom_bypass' => AlarmLook(t.armedBypass, Ns.danger, 'mdi:shield-half-full'),
+      'arming' => AlarmLook(t.arming, Ns.amber, 'mdi:shield-sync'),
+      'pending' => AlarmLook(t.pending, Ns.amber, 'mdi:shield-alert'),
+      'triggered' => AlarmLook(t.triggered, Ns.danger, 'mdi:bell-ring'),
+      _ => AlarmLook(t.unavailable, Ns.muted, 'mdi:alert-circle-outline'),
     };
 
 /// Arm and disarm an alarm_control_panel, with the keypad when HA wants a
@@ -128,7 +129,8 @@ class _AlarmCardState extends State<AlarmCard> {
   /// the call, so a label set after the answer would outlive the state.
   /// The state clears it; so does a refusal, or twice echo_ms without either.
   Future<bool> _call(String service, String? code) async {
-    setState(() => _pendingLabel = service == 'alarm_disarm' ? 'Disarming…' : 'Arming…');
+    final t = L.of(context);
+    setState(() => _pendingLabel = service == 'alarm_disarm' ? t.disarming : t.arming);
     _pending?.cancel();
     _pending = Timer(Duration(milliseconds: c.intOr('echo_ms', 1500) * 2), () {
       if (mounted) setState(() => _pendingLabel = null);
@@ -166,10 +168,11 @@ class _AlarmCardState extends State<AlarmCard> {
   Widget build(BuildContext context) => AnimatedBuilder(
         animation: _entity,
         builder: (context, _) {
+          final t = L.of(context);
           final s = widget.env.states.get(_id);
           final accent = parseHex(c.str('accent')) ?? Ns.mint;
           final broken = s == null || s.state == 'unavailable' || s.state == 'unknown';
-          final look = alarmLook(broken ? null : s.state, accent);
+          final look = alarmLook(broken ? null : s.state, accent, t);
           final triggered = s?.state == 'triggered';
           final disarmed = s?.state == 'disarmed';
           final modes = alarmModesFor(c.listOr('modes'), s?.attr<num>('supported_features')?.toInt());
@@ -204,7 +207,7 @@ class _AlarmCardState extends State<AlarmCard> {
                                     color: look.color, fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -.3)),
                             Text(
                               changedBy != null && changedBy.isNotEmpty
-                                  ? '${c.titleOr(friendlyName(s, _id))} · by $changedBy'
+                                  ? '${c.titleOr(friendlyName(s, _id))} · ${t.changedBy(changedBy)}'
                                   : c.titleOr(friendlyName(s, _id)),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -231,10 +234,10 @@ class _AlarmCardState extends State<AlarmCard> {
                                   Expanded(
                                     child: _Btn(
                                       icon: mdi(m.icon, MdiIcons.shield),
-                                      label: m.label,
+                                      label: t.alarmMode(m.key),
                                       color: accent,
                                       compact: compact,
-                                      onTap: () => _act(context, service: m.service, label: 'Arm ${m.label.toLowerCase()}', arming: true),
+                                      onTap: () => _act(context, service: m.service, label: t.armIn(m.key), arming: true),
                                     ),
                                   ),
                                 ],
@@ -242,10 +245,10 @@ class _AlarmCardState extends State<AlarmCard> {
                             )
                           : _Btn(
                               icon: MdiIcons.shieldOffOutline,
-                              label: 'Disarm',
+                              label: t.disarm,
                               color: triggered ? Ns.text : accent,
                               compact: false,
-                              onTap: () => _act(context, service: 'alarm_disarm', label: 'Disarm', arming: false),
+                              onTap: () => _act(context, service: 'alarm_disarm', label: t.disarm, arming: false),
                             ),
                 ),
               ],

@@ -179,6 +179,64 @@ void main() {
     },
   );
 
+  // issue #16: style pro showed weekdays in hourly mode
+  testWidgets('style pro labels an hourly forecast with the hour', (
+    tester,
+  ) async {
+    final fake = FakeHa({
+      'weather.home': st('weather.home', 'cloudy', {
+        'friendly_name': 'Home',
+        'temperature': 11.6,
+        'temperature_unit': '°C',
+        'forecast': _forecast,
+      }),
+    });
+    final env = await _env(fake);
+    Future<void> show(Map<String, dynamic> c) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(width: 480, height: 480, child: buildCard(c, env)),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    String hourOf(Map f) => DateTime.parse(
+      f['datetime'] as String,
+    ).toLocal().hour.toString().padLeft(2, '0');
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final day = days[DateTime.parse(
+          _forecast[0]['datetime'] as String,
+        ).toLocal().weekday -
+        1];
+
+    await show({
+      'type': 'custom:nspanel-weather-card',
+      'entity': 'weather.home',
+      'style': 'pro',
+      'forecast_type': 'hourly',
+    });
+    expect(tester.takeException(), isNull);
+    for (final f in _forecast) {
+      expect(find.text(hourOf(f)), findsOneWidget);
+    }
+    expect(find.text(day), findsNothing);
+
+    // daily stays on weekdays
+    await show({
+      'type': 'custom:nspanel-weather-card',
+      'entity': 'weather.home',
+      'style': 'pro',
+    });
+    expect(find.text(day), findsWidgets);
+    expect(find.text(hourOf(_forecast[1])), findsNothing);
+
+    await tester.pumpWidget(const SizedBox());
+    unawaited(env.conn.dispose());
+  });
+
   testWidgets('the screensaver weather: now, and today', (tester) async {
     final fake = FakeHa({
       'weather.home': st('weather.home', 'rainy', {

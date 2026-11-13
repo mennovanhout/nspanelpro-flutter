@@ -75,7 +75,29 @@ class PanelBridge {
     'brightness_max',
     'brightness_daylight',
     'text_size',
+    'language',
   ];
+
+  /// The language select's options, each in its own language so whoever
+  /// picks one can read it; the first follows Home Assistant.
+  static const languageOptions = {
+    '': 'Home Assistant',
+    'en': 'English',
+    'nl': 'Nederlands',
+    'de': 'Deutsch',
+  };
+
+  /// A panel language code (empty = follow HA) as the select shows it.
+  static String languageOption(String code) =>
+      languageOptions[code] ?? languageOptions['']!;
+
+  /// The select's option back to a code; null for anything else.
+  static String? languageCode(String option) {
+    for (final e in languageOptions.entries) {
+      if (e.value == option) return e.key;
+    }
+    return null;
+  }
 
   String get base => 'nspanel/$deviceId';
   String get availabilityTopic => '$base/availability';
@@ -245,6 +267,12 @@ class PanelBridge {
         'mode': 'slider',
         'unit_of_measurement': '%',
         'icon': 'mdi:format-size',
+        ...conf,
+      }, command: true),
+      'select/$deviceId/language': e('language', {
+        'name': 'Language',
+        'options': languageOptions.values.toList(),
+        'icon': 'mdi:translate',
         ...conf,
       }, command: true),
       'number/$deviceId/proximity_delta': e('proximity_delta', {

@@ -10,7 +10,13 @@ import 'package:nspanel_app/ha/transport.dart';
 /// shape as dev/kiosk-mock.js in the cards repo. Service calls mutate its
 /// house and echo back a state_changed, so the round trip is real.
 class FakeHa implements HaTransport {
-  FakeHa(this.states, {this.acceptToken = 'good'}) {
+  FakeHa(
+    this.states, {
+    this.acceptToken = 'good',
+    this.systemLanguage = 'en',
+    this.userLanguage,
+    this.userData = true,
+  }) {
     scheduleMicrotask(
       () => _emit({'type': 'auth_required', 'ha_version': 'test'}),
     );
@@ -18,6 +24,13 @@ class FakeHa implements HaTransport {
 
   final Map<String, Map<String, dynamic>> states;
   final String acceptToken;
+
+  /// get_config's language, and the profile's (null = never picked, as HA
+  /// keeps it). [userData] false is an HA without frontend user data.
+  final String systemLanguage;
+  String? userLanguage;
+  final bool userData;
+  int? _userDataSub;
   final _out = StreamController<String>();
   final calls = <String>[];
   final sent = <Map<String, dynamic>>[];
@@ -132,6 +145,22 @@ class FakeHa implements HaTransport {
           // a beat later, like a real alarm: the card's optimistic label is visible meanwhile
           Timer(const Duration(milliseconds: 50), () => push(id));
         }
+      case 'get_config':
+        _emit({
+          'id': msg['id'],
+          'type': 'result',
+          'success': true,
+          'result': {'language': systemLanguage, 'version': 'test'},
+        });
+      case 'frontend/subscribe_user_data' when userData:
+        _userDataSub = msg['id'] as int;
+        _emit({
+          'id': msg['id'],
+          'type': 'result',
+          'success': true,
+          'result': null,
+        });
+        _emitUserLanguage();
       case 'lovelace/config':
         _emit({
           'id': msg['id'],
@@ -158,6 +187,26 @@ class FakeHa implements HaTransport {
           },
         });
     }
+  }
+
+  /// The user picks a language in their HA profile.
+  void setUserLanguage(String? code) {
+    userLanguage = code;
+    _emitUserLanguage();
+  }
+
+  void _emitUserLanguage() {
+    final id = _userDataSub;
+    if (id == null) return;
+    _emit({
+      'id': id,
+      'type': 'event',
+      'event': {
+        'value': userLanguage == null
+            ? null
+            : {'language': userLanguage, 'number_format': 'language'},
+      },
+    });
   }
 
   void push(String id) {

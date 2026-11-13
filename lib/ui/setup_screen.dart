@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../config/settings.dart';
+import '../l10n/strings.dart';
 import '../update/updater.dart';
 import '../util/proximity.dart';
 import 'theme.dart';
@@ -75,7 +76,7 @@ class _SetupScreenState extends State<SetupScreen> {
         ? (widget.initial?.token ?? '')
         : _token.text.trim();
     if (_url.text.trim().isEmpty || token.isEmpty) {
-      setState(() => _err = 'Both the URL and a token are needed.');
+      setState(() => _err = L.of(context).setupBothNeeded);
       return;
     }
     final host = _mqttHost.text.trim();
@@ -107,12 +108,15 @@ class _SetupScreenState extends State<SetupScreen> {
       textSize: int.tryParse(_textSize.text.trim()) ??
           widget.initial?.textSize ??
           100,
+      language: widget.initial?.language ?? '',
+      haLanguage: widget.initial?.haLanguage ?? '',
     );
     s.save().then((_) => widget.onSaved(s));
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = L.of(context);
     final field = InputDecoration(
       filled: true,
       fillColor: Ns.surface,
@@ -127,24 +131,23 @@ class _SetupScreenState extends State<SetupScreen> {
         child: ListView(
           padding: const EdgeInsets.all(22),
           children: [
-            const Text(
-              'Connect to Home Assistant',
-              style: TextStyle(
+            Text(
+              t.setupTitle,
+              style: const TextStyle(
                 color: Ns.text,
                 fontSize: 21,
                 fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Create a long-lived access token under your profile, Security, at the '
-              'bottom. It is stored on this panel only.',
-              style: TextStyle(color: Ns.muted, fontSize: 14, height: 1.45),
+            Text(
+              t.setupIntro,
+              style: const TextStyle(color: Ns.muted, fontSize: 14, height: 1.45),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Home Assistant URL',
-              style: TextStyle(color: Ns.muted, fontSize: 13),
+            Text(
+              t.setupUrl,
+              style: const TextStyle(color: Ns.muted, fontSize: 13),
             ),
             const SizedBox(height: 6),
             TextField(
@@ -155,8 +158,8 @@ class _SetupScreenState extends State<SetupScreen> {
             const SizedBox(height: 12),
             Text(
               widget.initial == null
-                  ? 'Long-lived access token'
-                  : 'New token (leave empty to keep the current one)',
+                  ? t.setupToken
+                  : t.setupNewToken,
               style: const TextStyle(color: Ns.muted, fontSize: 13),
             ),
             const SizedBox(height: 6),
@@ -167,19 +170,19 @@ class _SetupScreenState extends State<SetupScreen> {
               style: const TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Dashboard (url path, empty = default)',
-              style: TextStyle(color: Ns.muted, fontSize: 13),
+            Text(
+              t.setupDashboard,
+              style: const TextStyle(color: Ns.muted, fontSize: 13),
             ),
             const SizedBox(height: 6),
             TextField(
               controller: _dash,
-              decoration: field.copyWith(hintText: 'e.g. nspanel'),
+              decoration: field.copyWith(hintText: '${t.setupExample} nspanel'),
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Device name in Home Assistant',
-              style: TextStyle(color: Ns.muted, fontSize: 13),
+            Text(
+              t.setupDeviceName,
+              style: const TextStyle(color: Ns.muted, fontSize: 13),
             ),
             const SizedBox(height: 6),
             TextField(
@@ -187,16 +190,16 @@ class _SetupScreenState extends State<SetupScreen> {
               decoration: field.copyWith(hintText: 'NSPanel Dining'),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'MQTT broker (host or host:port, empty = no device)',
-              style: TextStyle(color: Ns.muted, fontSize: 13),
+            Text(
+              t.setupMqtt,
+              style: const TextStyle(color: Ns.muted, fontSize: 13),
             ),
             const SizedBox(height: 6),
             TextField(
               controller: _mqttHost,
               keyboardType: TextInputType.url,
               decoration: field.copyWith(
-                hintText: 'e.g. 10.0.0.2 or homeassistant.local:1883',
+                hintText: '${t.setupExample} 10.0.0.2, homeassistant.local:1883',
               ),
             ),
             const SizedBox(height: 12),
@@ -205,7 +208,7 @@ class _SetupScreenState extends State<SetupScreen> {
                 Expanded(
                   child: TextField(
                     controller: _mqttUser,
-                    decoration: field.copyWith(hintText: 'MQTT user'),
+                    decoration: field.copyWith(hintText: t.setupMqttUser),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -215,17 +218,17 @@ class _SetupScreenState extends State<SetupScreen> {
                     obscureText: true,
                     decoration: field.copyWith(
                       hintText: widget.initial?.mqttPass != null
-                          ? 'password (kept)'
-                          : 'MQTT password',
+                          ? t.setupPassKept
+                          : t.setupMqttPass,
                     ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Text size in % (${Settings.minTextSize}-${Settings.maxTextSize})',
-              style: TextStyle(color: Ns.muted, fontSize: 13),
+            Text(
+              t.setupTextSize(Settings.minTextSize, Settings.maxTextSize),
+              style: const TextStyle(color: Ns.muted, fontSize: 13),
             ),
             const SizedBox(height: 6),
             TextField(
@@ -257,7 +260,7 @@ class _SetupScreenState extends State<SetupScreen> {
                   ),
                 ),
                 onPressed: _save,
-                child: const Text('Connect'),
+                child: Text(t.setupConnect),
               ),
             ),
             const SizedBox(height: 18),
@@ -267,8 +270,8 @@ class _SetupScreenState extends State<SetupScreen> {
               stream: Proximity.stream,
               builder: (_, snap) => Text(
                 snap.hasError
-                    ? 'No proximity sensor on this device.'
-                    : 'Proximity sensor now: ${snap.data?.toStringAsFixed(0) ?? '…'}',
+                    ? t.setupNoProximity
+                    : t.setupProximityNow(snap.data?.toStringAsFixed(0) ?? '…'),
                 style: const TextStyle(
                   color: Ns.muted,
                   fontSize: 13,
@@ -301,13 +304,14 @@ class _UpdateRow extends StatelessWidget {
       updater.status,
     ]),
     builder: (context, _) {
+      final t = L.of(context);
       final busy = updater.progress.value != null;
       final status = updater.status.value;
       return Row(
         children: [
           Expanded(
             child: Text(
-              'App ${updater.installed}${status.isEmpty ? '' : ' · $status'}'
+              '${t.setupApp} ${updater.installed}${status.isEmpty ? '' : ' · $status'}'
               '${busy ? ' ${updater.progress.value}%' : ''}',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -333,14 +337,14 @@ class _UpdateRow extends StatelessWidget {
                 ),
               ),
               onPressed: () => updater.install(),
-              child: Text('Update to ${updater.latest.value!.version}'),
+              child: Text(t.setupUpdateTo(updater.latest.value!.version)),
             )
           else if (!busy)
             TextButton(
               onPressed: () => updater.check(),
-              child: const Text(
-                'Check for updates',
-                style: TextStyle(color: Ns.muted, fontSize: 13),
+              child: Text(
+                t.setupCheckUpdates,
+                style: const TextStyle(color: Ns.muted, fontSize: 13),
               ),
             ),
         ],

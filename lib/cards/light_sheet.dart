@@ -6,6 +6,7 @@ import '../ha/states.dart';
 import '../ui/sheet.dart';
 import '../util/icons.dart';
 import 'echo.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 import 'light_capabilities.dart';
 import 'light_controls.dart';
@@ -31,6 +32,8 @@ class LightSheet extends StatefulWidget {
 }
 
 class _LightSheetState extends State<LightSheet> with EchoMixin {
+  Strings get tr => L.of(context);
+
   LightControls get controls => LightControls(widget.config, widget.env);
   void _hold(double v) {
     holdLocal(v, widget.config.intOr('echo_ms', 1500));
@@ -52,7 +55,7 @@ class _LightSheetState extends State<LightSheet> with EchoMixin {
       final on = s?.isOn ?? false;
       return ControlSheet(
         title: widget.config.titleOr(friendlyName(s, controls.entity)),
-        state: !caps.available ? 'Unavailable' : (on ? 'On' : 'Off'),
+        state: !caps.available ? tr.unavailable : (on ? tr.on : tr.off),
         value: (widget.resolveValue ?? display)(controls.entityValue(s)),
         accent: controls.accent(s),
         fromTop: false,
@@ -60,7 +63,7 @@ class _LightSheetState extends State<LightSheet> with EchoMixin {
         enabled: caps.available,
         step: widget.config.numOr('step', 5),
         actions: [
-          for (final p in controls.presets.take(3))
+          for (final p in controls.presets(tr).take(3))
             SheetAction(
               label: p.str('name') ?? '${p['brightness_pct']}%',
               icon: mdi(p.str('icon'), MdiIcons.lightbulbOnOutline),
@@ -68,7 +71,7 @@ class _LightSheetState extends State<LightSheet> with EchoMixin {
               run: () => _preset(p),
             ),
           SheetAction(
-            label: on ? 'Turn off' : 'Turn on',
+            label: on ? tr.turnOff : tr.turnOn,
             icon: on ? MdiIcons.lightbulbOff : MdiIcons.lightbulbOn,
             primary: true,
             run: () => controls.call(on ? 'turn_off' : 'turn_on'),

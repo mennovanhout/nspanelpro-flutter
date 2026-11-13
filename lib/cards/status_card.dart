@@ -6,9 +6,9 @@ import '../ha/states.dart';
 import '../ui/info_shell.dart';
 import '../ui/theme.dart';
 import '../util/color.dart';
-import '../util/fmt.dart';
 import '../util/icons.dart';
 import 'env.dart';
+import '../l10n/strings.dart';
 
 /// What counts as "not normal", by domain. Anything not listed is never a
 /// problem unless the config says so with problem_when.
@@ -40,10 +40,10 @@ class StatusCard extends StatelessWidget {
     return list?.contains(s.state) ?? false;
   }
 
-  String _label(CardConfig item, HaState? s) {
-    if (s == null) return 'Missing';
-    if (s.state == 'unavailable') return 'Unavailable';
-    if (s.state == 'unknown') return 'Unknown';
+  String _label(Strings t, CardConfig item, HaState? s) {
+    if (s == null) return t.missing;
+    if (s.state == 'unavailable') return t.unavailable;
+    if (s.state == 'unknown') return t.unknown;
     if (s.domain == 'binary_sensor') {
       final on = s.isOn;
       switch (s.deviceClass) {
@@ -51,23 +51,24 @@ class StatusCard extends StatelessWidget {
         case 'window':
         case 'garage_door':
         case 'opening':
-          return on ? 'Open' : 'Closed';
+          return on ? t.stateOpen : t.stateClosed;
         case 'motion':
         case 'occupancy':
-          return on ? 'Detected' : 'Clear';
+          return on ? t.detected : t.clear;
         case 'moisture':
-          return on ? 'Wet' : 'Dry';
+          return on ? t.wet : t.dry;
         case 'problem':
-          return on ? 'Problem' : 'OK';
+          return on ? t.problem : t.ok;
         default:
-          return on ? 'On' : 'Off';
+          return on ? t.on : t.off;
       }
     }
-    return capitalise(s.state);
+    return t.state(s.state);
   }
 
   @override
   Widget build(BuildContext context) {
+    final t = L.of(context);
     final ids = [for (final i in items) i.str('entity')]
         .whereType<String>()
         .toList();
@@ -95,7 +96,7 @@ class StatusCard extends StatelessWidget {
                 item.str('icon') ?? s?.attr<String>('icon') ?? classIcon(s, id),
               ),
               name: item.str('name') ?? friendlyName(s, id),
-              sub: _label(item, s),
+              sub: _label(t, item, s),
               alert: bad,
               // to tell a leak from a window left open; only while it is a
               // problem, so a normal tile stays quiet
@@ -118,7 +119,7 @@ class StatusCard extends StatelessWidget {
                     Icon(MdiIcons.checkCircleOutline, size: 44, color: accent),
                     const SizedBox(height: 10),
                     Text(
-                      config.str('all_clear') ?? 'All clear',
+                      config.str('all_clear') ?? t.allClear,
                       style: const TextStyle(
                         color: Ns.muted,
                         fontSize: 18,

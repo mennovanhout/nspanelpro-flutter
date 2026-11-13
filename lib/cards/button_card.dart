@@ -10,6 +10,7 @@ import '../ui/info_shell.dart';
 import '../ui/theme.dart';
 import '../util/color.dart';
 import '../util/icons.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 
 /// What to call for a bare entity, by domain. Anything not listed toggles.
@@ -49,6 +50,8 @@ class _Btn {
 }
 
 class _ButtonCardState extends State<ButtonCard> {
+  Strings get tr => L.of(context);
+
   CardConfig get c => widget.config;
   late final List<_Btn> _btns = _items().map(_Btn.new).toList();
   final _timers = <Timer>[];
@@ -187,9 +190,9 @@ class _ButtonCardState extends State<ButtonCard> {
     final showName = _showName(b.item);
 
     final label = b.armed
-        ? (b.item.str('confirm_text') ?? c.str('confirm_text') ?? 'Tap again')
+        ? (b.item.str('confirm_text') ?? c.str('confirm_text') ?? tr.tapAgain)
         : (b.item.str('name') ??
-              (entity != null ? friendlyName(s, entity) : 'Run'));
+              (entity != null ? friendlyName(s, entity) : tr.run));
     final icon = broken
         ? MdiIcons.alertCircleOutline
         : b.fired

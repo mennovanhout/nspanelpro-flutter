@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../l10n/strings.dart';
+
 /// Where Home Assistant is and how to prove who we are. Stored on the panel
 /// and nowhere else.
 class Settings {
@@ -21,6 +23,8 @@ class Settings {
     this.overrides,
     this.brightness,
     int textSize = 100,
+    this.language = '',
+    this.haLanguage = '',
   }) {
     this.textSize = textSize;
   }
@@ -93,6 +97,18 @@ class Settings {
   int _textSize = 100;
   static const minTextSize = 80, maxTextSize = 140;
 
+  /// The panel's language: `en`, `nl`, `de`, or empty to follow Home
+  /// Assistant. Panel-only, like the text size; the select on the device
+  /// page and setup.json's `language` set it.
+  String language;
+
+  /// The language Home Assistant last said it speaks, kept so the panel
+  /// starts in it before the websocket is up.
+  String haLanguage;
+
+  /// The language to draw in now: the panel's own, else HA's, else English.
+  Lang get lang => langFromCode(language) ?? langFromCode(haLanguage) ?? Lang.en;
+
   /// Lovelace url_path of the dashboard to render; empty = the default one.
   String dashboard;
 
@@ -112,6 +128,12 @@ class Settings {
   static const _kOverrides = 'overrides';
   static const _kBrightness = 'brightness';
   static const _kTextSize = 'text_size';
+  static const _kLanguage = 'language';
+  static const _kHaLanguage = 'ha_language';
+
+  /// `nl`, `NL`, `nl-BE` -> `nl`; `auto`, empty, or a language the panel
+  /// does not speak -> empty, which follows Home Assistant.
+  static String _languageSetting(String? v) => langFromCode(v)?.name ?? '';
 
   static Map<String, dynamic>? _map(SharedPreferences p, String key) {
     final raw = p.getString(key);
@@ -181,6 +203,10 @@ class Settings {
             : current?.brightness,
         textSize:
             (j['text_size'] as num?)?.toInt() ?? current?.textSize ?? 100,
+        language: j.containsKey('language')
+            ? _languageSetting(j['language']?.toString())
+            : current?.language ?? '',
+        haLanguage: current?.haLanguage ?? '',
       );
       await s.save();
       return true;
@@ -210,6 +236,8 @@ class Settings {
       overrides: _map(p, _kOverrides),
       brightness: _map(p, _kBrightness),
       textSize: p.getInt(_kTextSize) ?? 100,
+      language: p.getString(_kLanguage) ?? '',
+      haLanguage: p.getString(_kHaLanguage) ?? '',
     );
   }
 
@@ -221,6 +249,8 @@ class Settings {
     await p.setString(_kName, name);
     await p.setString(_kTts, ttsEngine);
     await p.setInt(_kTextSize, textSize);
+    await p.setString(_kLanguage, language);
+    await p.setString(_kHaLanguage, haLanguage);
     final maps = {
       _kSaver: screensaver,
       _kMqtt: mqtt,
@@ -253,6 +283,8 @@ class Settings {
     await p.remove(_kMqtt);
     await p.remove(_kName);
     await p.remove(_kTextSize);
+    await p.remove(_kLanguage);
+    await p.remove(_kHaLanguage);
     await p.remove(_kTts);
     await p.remove(_kOverrides);
     await p.remove(_kBrightness);

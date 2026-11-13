@@ -292,6 +292,15 @@ It is also on the setup screen, for a panel without MQTT, and `"text_size": 120`
 At 140% a card can need about 20 px more `height`. The screensaver has `clock_size` of its own
 and is left alone.
 
+**Language.** The panel speaks English, Nederlands or Deutsch: every card, sheet, keypad, the
+screensaver's date and the setup screen. By default it follows Home Assistant - the language in
+the profile of the user whose token the panel has, or HA's system language when that user never
+picked one - and changes as soon as the profile does. Any other language falls back to English.
+**Language** on the device page pins one panel to a language regardless (`Home Assistant` follows
+again), and `"language": "nl"` in `setup.json` does the same from a file. Like the text size it is
+the panel's own: **Use dashboard settings** leaves it alone. Names you gave things in HA or in the
+dashboard (`name`, `on_text`, `confirm_text`, preset names) are shown as you wrote them.
+
 **Sleep.** With `sleep: true` the screensaver turns the LCD backlight fully off - not the
 "Screen brightness" entity's 0, which on this panel is the driver's floor of 10/255 and still
 glows in a dark room - and turns it back on for anything that wakes the screensaver: someone
@@ -371,7 +380,8 @@ The app reads it once, saves the settings, and deletes the file. Delete `setup.j
 computer too; it has your token in it. A later file is a **partial** update — only the keys in
 it change — which is how you re-point a panel at a different dashboard, or adjust its
 screensaver, from your desk without re-entering the token. The full set of keys is `url`,
-`token`, `dashboard`, `name`, `mqtt`, `tts_engine`, `screensaver` and `feedback`.
+`token`, `dashboard`, `name`, `mqtt`, `tts_engine`, `screensaver`, `feedback`, `brightness`,
+`text_size` and `language`.
 
 ### Touch feedback
 
@@ -446,6 +456,7 @@ Give the app your MQTT broker and it registers itself through MQTT discovery: on
 | `number` Idle timeout, `switch` Sleep, `number` Sleep after, `number` Wake sensitivity | the screensaver's `after`, `sleep`, `sleep_after` and `proximity_delta`, changeable from HA (see Panel settings) |
 | `switch` Auto brightness, `number` minimum / maximum / daylight | the screen follows the light sensor (see Panel settings) |
 | `number` Text size | 80-140%, everything but the screensaver (see Panel settings) |
+| `select` Language | Home Assistant (follow it), English, Nederlands or Deutsch (see Panel settings) |
 | `button` Use dashboard settings | drops every override; the dashboard card is the config again |
 | `button` Stop audio | |
 | Wi-Fi signal, SoC temperature, slow frames, app version, last touch | diagnostics |

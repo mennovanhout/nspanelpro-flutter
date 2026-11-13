@@ -9,6 +9,7 @@ import '../ui/theme.dart';
 import '../util/color.dart';
 import '../util/icons.dart';
 import 'echo.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 
 const _setPosition = 4;
@@ -23,16 +24,18 @@ class CoverCard extends StatefulWidget {
 }
 
 class _CoverCardState extends State<CoverCard> with EchoMixin {
+  Strings get tr => L.of(context);
+
   CardConfig get c => widget.config;
   String get entity => c.str('entity') ?? '';
   int get echoMs => c.intOr('echo_ms', 1500);
 
   List<CardConfig> get presets => c['presets'] is List
       ? c.maps('presets')
-      : const [
-          {'name': 'Open', 'position': 100},
-          {'name': 'Half', 'position': 50},
-          {'name': 'Shut', 'position': 0},
+      : [
+          {'name': tr.coverPresetOpen, 'position': 100},
+          {'name': tr.coverPresetHalf, 'position': 50},
+          {'name': tr.coverPresetShut, 'position': 0},
         ];
 
   /// value = how OPEN it is, 0..1
@@ -66,12 +69,12 @@ class _CoverCardState extends State<CoverCard> with EchoMixin {
 
   String _stateText(HaState? s, int pct) {
     if (s == null) return '';
-    if (s.state == 'opening') return 'Opening';
-    if (s.state == 'closing') return 'Closing';
+    if (s.state == 'opening') return tr.coverOpening;
+    if (s.state == 'closing') return tr.coverClosing;
     if (s.numAttr('current_position') != null) {
-      return pct >= 99 ? 'Open' : (pct <= 0 ? 'Closed' : '$pct% open');
+      return pct >= 99 ? tr.stateOpen : (pct <= 0 ? tr.stateClosed : tr.coverPercentOpen(pct));
     }
-    return s.state == 'open' ? 'Open' : 'Closed';
+    return s.state == 'open' ? tr.stateOpen : tr.stateClosed;
   }
 
   void _openSheet(HaState? s) {
@@ -85,9 +88,9 @@ class _CoverCardState extends State<CoverCard> with EchoMixin {
       accent: parseHex(c.str('accent')) ?? Ns.sky,
       step: c.numOr('step', 5),
       actions: [
-        SheetAction(label: 'Open', icon: MdiIcons.arrowUp, run: () => _call('open_cover')),
-        SheetAction(label: 'Stop', icon: MdiIcons.stop, primary: true, close: false, run: () => _call('stop_cover')),
-        SheetAction(label: 'Close', icon: MdiIcons.arrowDown, run: () => _call('close_cover')),
+        SheetAction(label: tr.coverOpen, icon: MdiIcons.arrowUp, run: () => _call('open_cover')),
+        SheetAction(label: tr.coverStop, icon: MdiIcons.stop, primary: true, close: false, run: () => _call('stop_cover')),
+        SheetAction(label: tr.coverClose, icon: MdiIcons.arrowDown, run: () => _call('close_cover')),
       ],
       onInput: (nv) => holdLocal(nv, echoMs),
       onCommit: (nv) {
@@ -122,7 +125,7 @@ class _CoverCardState extends State<CoverCard> with EchoMixin {
           leading: IconBox(mdi(icon), on: !broken && pct < 55),
           value: ValueText(broken ? '—' : '$pct', unit: broken ? '' : '%'),
           title: c.titleOr(friendlyName(s, entity)),
-          sub: broken ? 'Unavailable' : _stateText(s, pct),
+          sub: broken ? tr.unavailable : _stateText(s, pct),
           chips: showPresets
               ? [
                   for (final p in presets.take(4))

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../l10n/strings.dart';
 import 'theme.dart';
 
 /// The code sheet for the alarm card: masked dots, a 3×4 keypad (or a text
@@ -13,7 +14,7 @@ Future<void> showKeypadSheet(
   required String title,
   required Color accent,
   bool text = false,
-  String hint = 'Enter the code',
+  String? hint,
   required Future<bool> Function(String code) onSubmit,
 }) {
   return showGeneralDialog<void>(
@@ -41,11 +42,12 @@ class _Keypad extends StatefulWidget {
     required this.title,
     required this.accent,
     required this.text,
-    required this.hint,
+    this.hint,
     required this.onSubmit,
   });
 
-  final String title, hint;
+  final String title;
+  final String? hint;
   final Color accent;
   final bool text;
   final Future<bool> Function(String code) onSubmit;
@@ -123,7 +125,7 @@ class _KeypadState extends State<_Keypad> {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(color: Ns.text, fontSize: 22, fontWeight: FontWeight.w700)),
-                        Text(_wrong ? 'Wrong code' : widget.hint,
+                        Text(_wrong ? L.of(context).wrongCode : widget.hint ?? L.of(context).enterCode,
                             style: TextStyle(
                                 color: _wrong ? Ns.danger : Ns.muted, fontSize: 15, fontWeight: FontWeight.w500)),
                       ],

@@ -6,30 +6,8 @@ import 'package:flutter/material.dart';
 
 import '../config/screensaver.dart';
 import 'theme.dart';
+import '../l10n/strings.dart';
 
-const _months = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-];
-const _days = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
-];
 
 /// What the panel shows when nobody is using it: a photo, and a clock that
 /// wanders so nothing burns in. Any touch wakes it; so does the proximity
@@ -237,7 +215,7 @@ class _ScreensaverState extends State<Screensaver> {
               child: _FrostedClock(
                 time: cfg.clock ? '$hh:$mm' : null,
                 date: cfg.clock && cfg.clockDate
-                    ? '${_days[_now.weekday - 1]} ${_now.day} ${_months[_now.month - 1]}'
+                    ? L.of(context).longDate(_now)
                     : null,
                 frost: cfg.frost,
                 size: cfg.clockSize,

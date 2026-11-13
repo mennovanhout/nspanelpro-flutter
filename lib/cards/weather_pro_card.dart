@@ -5,10 +5,9 @@ import '../ha/connection.dart';
 import '../ha/states.dart';
 import '../util/fmt.dart';
 import '../util/icons.dart';
-import '../util/weather.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 
-const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 /// A full-screen weather page: `style: pro` on the weather card, native only.
 ///
@@ -31,6 +30,8 @@ class WeatherProCard extends StatefulWidget {
 }
 
 class _WeatherProCardState extends State<WeatherProCard> {
+  Strings get tr => L.of(context);
+
   CardConfig get c => widget.config;
   String get entity => c.str('entity') ?? '';
 
@@ -163,7 +164,7 @@ class _WeatherProCardState extends State<WeatherProCard> {
     );
   }
 
-  String _conditionLabel(HaState? s) => conditionLabel(_condition(s));
+  String _conditionLabel(HaState? s) => tr.condition(_condition(s));
 
   List<dynamic> _forecastList(HaState? s) {
     if (!c.boolOr('show_forecast', true)) {
@@ -405,7 +406,7 @@ class _WeatherProCardState extends State<WeatherProCard> {
                               const SizedBox(width: 18),
                               _info(
                                 Icons.nightlight_round,
-                                'Night',
+                                tr.night,
                               ),
                             ],
                         ],
@@ -513,9 +514,13 @@ class _WeatherProCardState extends State<WeatherProCard> {
     final high = m['temperature'] as num?;
     final low = m['templow'] as num?;
 
+    // an hourly forecast gets the hour, like the basic weather card
+    final hourly = c.str('forecast_type') == 'hourly';
     final label = when == null
         ? ''
-        : _days[when.weekday - 1];
+        : (hourly
+              ? when.hour.toString().padLeft(2, '0')
+              : tr.dayShort(when));
 
     return Container(
       padding: const EdgeInsets.symmetric(

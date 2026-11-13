@@ -13,6 +13,7 @@ import 'package:nspanel_app/ui/sheet.dart';
 import 'package:nspanel_app/util/text_scale.dart';
 
 import 'connection_test.dart' show FakeHa, st;
+import 'package:nspanel_app/l10n/strings.dart';
 
 final _house = {
   'light.l': st('light.l', 'on', {
@@ -83,18 +84,25 @@ Future<(FakeHa, PanelEnv, HaConnection)> _env() async {
   return (fake, env, conn);
 }
 
-Widget _app(Map<String, dynamic> config, PanelEnv env, {double scale = 1}) =>
-    MaterialApp(
-      builder: (context, child) => MediaQuery(
-        data: MediaQuery.of(context).copyWith(
-          textScaler: PanelTextScaler(scale),
-        ),
-        child: child!,
+Widget _app(
+  Map<String, dynamic> config,
+  PanelEnv env, {
+  double scale = 1,
+  Strings strings = Strings.en,
+}) => L(
+  strings: ValueNotifier(strings),
+  child: MaterialApp(
+    builder: (context, child) => MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        textScaler: PanelTextScaler(scale),
       ),
-      home: Scaffold(
-        body: Center(child: SizedBox(width: 460, child: buildCard(config, env))),
-      ),
-    );
+      child: child!,
+    ),
+    home: Scaffold(
+      body: Center(child: SizedBox(width: 460, child: buildCard(config, env))),
+    ),
+  ),
+);
 
 void main() {
   testWidgets('alarm arm buttons fill their 60px row', (t) async {
@@ -376,6 +384,14 @@ void main() {
         await t.pumpWidget(_app(config, env, scale: Settings.maxTextSize / 100));
         await t.pump(const Duration(milliseconds: 100));
         expect(t.takeException(), isNull);
+        // Dutch and German words run longer than English ones
+        for (final lang in [Strings.nl, Strings.de]) {
+          await t.pumpWidget(
+            _app(config, env, scale: Settings.maxTextSize / 100, strings: lang),
+          );
+          await t.pump(const Duration(milliseconds: 100));
+          expect(t.takeException(), isNull, reason: '${lang.lang}');
+        }
         await t.pumpWidget(const SizedBox());
         unawaited(conn.dispose());
       });

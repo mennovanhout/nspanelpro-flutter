@@ -10,6 +10,7 @@ import '../util/color.dart';
 import '../util/fmt.dart';
 import '../util/icons.dart';
 import 'echo.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 
 const _hvacIcons = {
@@ -20,15 +21,6 @@ const _hvacIcons = {
   'auto': 'mdi:thermostat-auto',
   'dry': 'mdi:water-percent',
   'fan_only': 'mdi:fan',
-};
-const _hvacLabels = {
-  'off': 'Off',
-  'heat': 'Heat',
-  'cool': 'Cool',
-  'heat_cool': 'Auto',
-  'auto': 'Auto',
-  'dry': 'Dry',
-  'fan_only': 'Fan',
 };
 
 /// The setpoint under the same thumb as everything else. Tap opens the sheet
@@ -44,6 +36,8 @@ class ClimateCard extends StatefulWidget {
 }
 
 class _ClimateCardState extends State<ClimateCard> with EchoMixin {
+  Strings get tr => L.of(context);
+
   CardConfig get c => widget.config;
   String get entity => c.str('entity') ?? '';
   int get echoMs => c.intOr('echo_ms', 1500);
@@ -51,10 +45,10 @@ class _ClimateCardState extends State<ClimateCard> with EchoMixin {
 
   List<CardConfig> get presets => c['presets'] is List
       ? c.maps('presets')
-      : const [
-          {'name': 'Eco', 'temperature': 17},
-          {'name': 'Day', 'temperature': 20.5},
-          {'name': 'Warm', 'temperature': 22},
+      : [
+          {'name': tr.climateEco, 'temperature': 17},
+          {'name': tr.climateDay, 'temperature': 20.5},
+          {'name': tr.climateWarm, 'temperature': 22},
         ];
 
   /// The thermostat's own limits unless the config narrows them - worth
@@ -108,14 +102,14 @@ class _ClimateCardState extends State<ClimateCard> with EchoMixin {
     if (s == null) return '';
     final now = s.numAttr('current_temperature');
     final action = s.attr<String>('hvac_action');
-    final label = action != null ? capitalise(action) : (_hvacLabels[s.state] ?? s.state);
-    return now != null ? 'Now ${fmt(now, 1)}° · $label' : label;
+    final label = action != null ? tr.hvacAction(action) : (tr.hvacMode(s.state) ?? s.state);
+    return now != null ? '${tr.climateNow(fmt(now, 1))} · $label' : label;
   }
 
   void _openSheet(HaState? s) {
     final modes = (s?.attributes['hvac_modes'] as List? ?? const [])
         .whereType<String>()
-        .where(_hvacLabels.containsKey)
+        .where((m) => tr.hvacMode(m) != null)
         .take(4)
         .toList();
     final r = _range(s);
@@ -130,7 +124,7 @@ class _ClimateCardState extends State<ClimateCard> with EchoMixin {
       actions: [
         for (final m in modes)
           SheetAction(
-            label: _hvacLabels[m]!,
+            label: tr.hvacMode(m)!,
             icon: mdi(_hvacIcons[m]),
             primary: s?.state == m,
             run: () => _call('set_hvac_mode', {'hvac_mode': m}),
@@ -168,7 +162,7 @@ class _ClimateCardState extends State<ClimateCard> with EchoMixin {
           ),
           value: broken || off ? null : ValueText(fmt(target, 1), unit: '°'),
           title: c.titleOr(friendlyName(s, entity)),
-          sub: broken ? 'Unavailable' : _stateText(s),
+          sub: broken ? tr.unavailable : _stateText(s),
           chips: showPresets
               ? [
                   for (final p in presets.take(4))

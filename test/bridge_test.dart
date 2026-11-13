@@ -128,6 +128,23 @@ void main() {
     );
   });
 
+  test('the language is a select: follow HA or one of three, named in their own language', () async {
+    final c = bridge.discoveryConfigs()['select/abc123/language']!;
+    expect(c['options'], ['Home Assistant', 'English', 'Nederlands', 'Deutsch']);
+    expect(c['entity_category'], 'config');
+    for (final code in ['', 'en', 'nl', 'de']) {
+      expect(PanelBridge.languageCode(PanelBridge.languageOption(code)), code);
+    }
+    expect(PanelBridge.languageOption('fr'), 'Home Assistant');
+    expect(PanelBridge.languageCode('Français'), isNull);
+
+    bridge.start();
+    await pumpEventQueue();
+    broker.deliver('nspanel/abc123/language/set', 'Nederlands');
+    await pumpEventQueue();
+    expect(commands, ['setting language Nederlands']);
+  });
+
   test('settings from HA arrive as object and payload, and the reset button as a press', () async {
     bridge.start();
     await pumpEventQueue();

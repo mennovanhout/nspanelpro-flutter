@@ -1,19 +1,9 @@
+import '../l10n/strings.dart';
 import 'fmt.dart';
 
-/// What HA's condition ids mean in a sentence. Anything not listed reads
-/// fine with its dashes turned into spaces.
-const _conditionLabels = {
-  'partlycloudy': 'Partly cloudy',
-  'clear-night': 'Clear',
-  'lightning-rainy': 'Thunder, rain',
-  'snowy-rainy': 'Sleet',
-  'windy-variant': 'Windy',
-  'pouring': 'Heavy rain',
-  'exceptional': 'Severe',
-};
-
-String conditionLabel(String state) =>
-    _conditionLabels[state] ?? capitalise(state.replaceAll('-', ' '));
+/// What HA's condition ids mean in a sentence, in the panel's language.
+String conditionLabel(String state, [Strings t = Strings.en]) =>
+    t.condition(state);
 
 /// The rain in one forecast entry, as short as a forecast tile allows:
 /// `80% · 1.2mm`, `3% · 0mm`, and just the half the provider sends when it

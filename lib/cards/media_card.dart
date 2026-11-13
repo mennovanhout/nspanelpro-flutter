@@ -9,6 +9,7 @@ import '../ui/theme.dart';
 import '../util/color.dart';
 import '../util/icons.dart';
 import 'echo.dart';
+import '../l10n/strings.dart';
 import 'env.dart';
 
 // media_player supported_features
@@ -27,6 +28,8 @@ class MediaCard extends StatefulWidget {
 }
 
 class _MediaCardState extends State<MediaCard> with EchoMixin {
+  Strings get tr => L.of(context);
+
   CardConfig get c => widget.config;
   String get entity => c.str('entity') ?? '';
   int get echoMs => c.intOr('echo_ms', 1500);
@@ -76,16 +79,16 @@ class _MediaCardState extends State<MediaCard> with EchoMixin {
 
   ({String top, String sub}) _lines(HaState? s) {
     final device = c.titleOr(friendlyName(s, entity));
-    if (s == null || s.isBroken) return (top: device, sub: 'Unavailable');
-    if (_idle(s)) return (top: device, sub: s.state == 'off' ? 'Off' : 'Nothing playing');
+    if (s == null || s.isBroken) return (top: device, sub: tr.unavailable);
+    if (_idle(s)) return (top: device, sub: s.state == 'off' ? tr.off : tr.mediaNothing);
     final title = s.attr<String>('media_title');
     final top = title ?? device;
     final sub = s.attr<String>('media_artist') ??
         s.attr<String>('media_series_title') ??
         s.attr<String>('media_channel') ??
         s.attr<String>('media_album_name') ??
-        (title != null ? device : (s.state == 'paused' ? 'Paused' : 'Playing'));
-    return (top: top, sub: s.state == 'paused' ? 'Paused · $sub' : sub);
+        (title != null ? device : (s.state == 'paused' ? tr.mediaPaused : tr.mediaPlaying));
+    return (top: top, sub: s.state == 'paused' ? '${tr.mediaPaused} · $sub' : sub);
   }
 
   IconData _defaultIcon(HaState? s) {
@@ -110,20 +113,20 @@ class _MediaCardState extends State<MediaCard> with EchoMixin {
       step: c.numOr('step', 5),
       actions: [
         if (s?.supports(_prev) ?? false)
-          SheetAction(label: 'Previous', icon: MdiIcons.skipPrevious, close: false, run: () => _call('media_previous_track')),
+          SheetAction(label: tr.mediaPrevious, icon: MdiIcons.skipPrevious, close: false, run: () => _call('media_previous_track')),
         SheetAction(
-          label: _playing(s) ? 'Pause' : 'Play',
+          label: _playing(s) ? tr.mediaPause : tr.mediaPlay,
           icon: _playing(s) ? MdiIcons.pause : MdiIcons.play,
           primary: true,
           close: false,
           run: () => _call('media_play_pause'),
         ),
         if (s?.supports(_next) ?? false)
-          SheetAction(label: 'Next', icon: MdiIcons.skipNext, close: false, run: () => _call('media_next_track')),
+          SheetAction(label: tr.mediaNext, icon: MdiIcons.skipNext, close: false, run: () => _call('media_next_track')),
         if (s?.supports(_stop) ?? false)
-          SheetAction(label: 'Stop', icon: MdiIcons.stop, run: () => _call('media_stop'))
+          SheetAction(label: tr.mediaStop, icon: MdiIcons.stop, run: () => _call('media_stop'))
         else if (s?.supports(_turnOff) ?? false)
-          SheetAction(label: 'Off', icon: MdiIcons.power, run: () => _call('turn_off')),
+          SheetAction(label: tr.off, icon: MdiIcons.power, run: () => _call('turn_off')),
       ],
       onInput: (v) => holdLocal(v, echoMs),
       onCommit: (v) {

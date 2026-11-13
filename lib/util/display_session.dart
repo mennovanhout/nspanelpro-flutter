@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
 import '../config/screensaver.dart';
+import '../l10n/strings.dart';
 import 'device.dart';
 import 'display.dart';
 import 'display_controller.dart';
@@ -69,6 +70,10 @@ class DisplaySession {
   /// 1 is the normal size. Set by the dashboard, which has the settings; used
   /// by the app root, which does not.
   final textScale = ValueNotifier<double>(1);
+
+  /// The panel's language, provided above the navigator by [L]; the
+  /// dashboard sets it from the panel setting or Home Assistant.
+  final strings = ValueNotifier<Strings>(Strings.en);
   StreamSubscription<dynamic>? _events;
   StreamSubscription<double>? _sensor;
   ProximityPresence? _presence;
@@ -137,5 +142,6 @@ class DisplaySession {
     controller.dispose();
     saverWeather.dispose();
     textScale.dispose();
+    strings.dispose();
   }
 }

@@ -10,6 +10,8 @@ import 'cards/env.dart';
 import 'cards/registry.dart';
 import 'mqtt/bridge.dart';
 import 'mqtt/client.dart';
+import 'l10n/ha_language.dart';
+import 'l10n/strings.dart';
 import 'util/auto_brightness.dart';
 import 'util/device.dart';
 import 'util/display_session.dart';
@@ -34,7 +36,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.8.0';
+const appVersion = '0.9.0';
 
 class NsPanelApp extends StatefulWidget {
   const NsPanelApp({super.key});
@@ -56,7 +58,10 @@ class _NsPanelAppState extends State<NsPanelApp> {
     debugShowCheckedModeBanner: false,
     theme: Ns.theme(),
     home: Shell(display: _display),
-    builder: (context, child) => DisplayOverlay(
+    // the language outermost: the overlay's screensaver clock reads it too
+    builder: (context, child) => L(
+      strings: _display.strings,
+      child: DisplayOverlay(
       controller: _display.controller,
       weather: _display.saverWeather,
       // Inside the overlay, so the screensaver keeps its own `clock_size`. The
@@ -75,6 +80,7 @@ class _NsPanelAppState extends State<NsPanelApp> {
             child: child!,
           );
         },
+      ),
       ),
     ),
   );
@@ -113,6 +119,9 @@ class _ShellState extends State<Shell> {
         .then(
           (r) => setState(() {
             _settings = r.$1;
+            if (r.$1 != null) {
+              widget.display.strings.value = Strings.of(r.$1!.lang);
+            }
             _showSetup = r.$2;
             _loaded = true;
             // the app's own files dir: where setup.json goes, and where the
@@ -197,7 +206,8 @@ class _DashboardState extends State<Dashboard> {
   late final PanelEnv _env;
   List<PanelPage> _pages = const [];
   PagerOptions _pager = const PagerOptions();
-  String? _error;
+  /// Worded at draw time, so a language change re-words it too.
+  String Function(Strings t)? _error;
   Future<void> Function()? _unsubLovelace;
   int _lovelaceGen = -1;
 
@@ -278,12 +288,17 @@ class _DashboardState extends State<Dashboard> {
       }
     }
 
-    _conn.onReady = _loadConfig;
+    _conn.onReady = () {
+      _loadConfig();
+      _followHaLanguage();
+    };
     _conn.status.addListener(_onStatus);
     _conn.start();
     widget.display.controller.addListener(_displayChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        // after the frame: it notifies [L], an ancestor of this build
+        _applyLanguage();
         _configureDisplay();
         _displayChanged();
       }
@@ -465,6 +480,34 @@ class _DashboardState extends State<Dashboard> {
     b.setting('brightness_max', st.brightnessMax.toString());
     b.setting('brightness_daylight', st.brightnessDaylight.round().toString());
     b.setting('text_size', st.textSize.toString());
+    b.setting('language', PanelBridge.languageOption(st.language));
+  }
+
+  // ---- language --------------------------------------------------------------
+
+  Future<void> Function()? _unsubLanguage;
+  int _languageGen = -1;
+
+  /// The panel setting, else HA's, else English - drawn at once.
+  void _applyLanguage() {
+    widget.display.strings.value = Strings.of(widget.settings.lang);
+  }
+
+  /// HA's language, asked on every connect (subscriptions die with the
+  /// socket) and followed live, so changing it in HA changes the panel. Kept
+  /// in the settings, so the next start draws in it before HA answers.
+  Future<void> _followHaLanguage() async {
+    if (_languageGen == _conn.generation) return;
+    _languageGen = _conn.generation;
+    final unsub = await followHaLanguage(_conn, (code) {
+      if (code == widget.settings.haLanguage) return;
+      widget.settings.haLanguage = code;
+      widget.settings.save();
+      debugPrint('language: Home Assistant speaks $code');
+      if (mounted) _applyLanguage();
+    });
+    await _unsubLanguage?.call();
+    _unsubLanguage = unsub;
   }
 
   Future<void> _onSetting(String object, String value) async {
@@ -484,6 +527,11 @@ class _DashboardState extends State<Dashboard> {
         st.overrides = {...?st.overrides, 'proximity_delta': n.toDouble()};
       case 'text_size' when n != null:
         st.textSize = n.round();
+      case 'language':
+        final code = PanelBridge.languageCode(value);
+        if (code == null) return;
+        st.language = code;
+        _applyLanguage();
       case 'auto_brightness':
         st.brightness = {...?st.brightness, 'auto': on};
         _follower.reset();
@@ -556,13 +604,14 @@ class _DashboardState extends State<Dashboard> {
     widget.display.controller.removeListener(_displayChanged);
     _conn.status.removeListener(_onStatus);
     _unsubLovelace?.call();
+    _unsubLanguage?.call();
     _conn.dispose();
     super.dispose();
   }
 
   void _onStatus() {
     if (_conn.status.value == HaStatus.authFailed) {
-      widget.onReconfigure('That token was rejected. Paste a new one.');
+      widget.onReconfigure(widget.display.strings.value.tokenRejected);
     }
   }
 
@@ -582,8 +631,7 @@ class _DashboardState extends State<Dashboard> {
         // panel nobody touches should still go to sleep
         _configureDisplay();
         _error = pages.isEmpty
-            ? 'The dashboard "${path.isEmpty ? 'default' : path}" has no cards this app can '
-                  'draw. It needs custom:nspanel-* cards.'
+            ? (t) => t.noCards(path.isEmpty ? t.defaultDashboardShort : path)
             : null;
       });
       await widget.settings.cacheConfig(jsonEncode(cfg));
@@ -607,8 +655,8 @@ class _DashboardState extends State<Dashboard> {
   /// "Not found" from lovelace/config means one of two different things, and
   /// the person standing at the panel cannot tell which. Ask HA which
   /// dashboards exist and say so.
-  Future<String> _explain(String path, Object e) async {
-    final name = path.isEmpty ? 'the default dashboard' : '"$path"';
+  Future<String Function(Strings)> _explain(String path, Object e) async {
+    String name(Strings t) => path.isEmpty ? t.theDefaultDashboard : '"$path"';
     List<Map<String, dynamic>> list = const [];
     try {
       final r = await _conn.send({'type': 'lovelace/dashboards/list'});
@@ -617,21 +665,21 @@ class _DashboardState extends State<Dashboard> {
           .map((m) => m.cast<String, dynamic>())
           .toList();
     } catch (_) {
-      return 'Could not load $name: $e';
+      return (Strings t) => t.couldNotLoad(name(t), e);
     }
     final paths = list
         .map((d) => d['url_path']?.toString())
         .whereType<String>()
         .toList();
     if (path.isNotEmpty && paths.contains(path)) {
-      return 'Dashboard "$path" exists but has no saved config yet - it is still the '
-          'auto-generated one. In Home Assistant open it, then ⋮ → Edit dashboard → '
-          'Take control, add the nspanel cards and save. This panel reloads on its own.';
+      return (Strings t) => t.notTakenOver(path);
     }
-    final known = ['(empty) for the default dashboard', ...paths];
-    return 'Could not load $name: $e\n\nDashboards on this Home Assistant:\n'
-        '${known.map((p) => '  • $p').join('\n')}\n\n'
-        'Triple-tap the top-left corner to change it.';
+    return (Strings t) {
+      final known = [t.emptyForDefault, ...paths];
+      return '${t.couldNotLoad(name(t), e)}\n\n${t.dashboardsHere}\n'
+          '${known.map((p) => '  • $p').join('\n')}\n\n'
+          '${t.howToChange}';
+    };
   }
 
   /// Two fingers held still for a moment opens the setup screen.
@@ -691,6 +739,8 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   Widget build(BuildContext context) {
+    final t = L.of(context);
+    final error = _error?.call(t);
     return Scaffold(
       body: Listener(
         onPointerDown: (e) {
@@ -727,10 +777,10 @@ class _DashboardState extends State<Dashboard> {
                 child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Text(
-                    _error ?? 'Connecting…',
+                    error ?? t.connecting,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: _error == null ? Ns.muted : Ns.danger,
+                      color: error == null ? Ns.muted : Ns.danger,
                       fontSize: 15,
                       height: 1.4,
                     ),
@@ -744,7 +794,7 @@ class _DashboardState extends State<Dashboard> {
                   for (final p in _pages) _page(p, animate: false, index: -1),
                 ],
               ),
-            if (_error != null && _pages.isNotEmpty)
+            if (error != null && _pages.isNotEmpty)
               Positioned(
                 left: 12,
                 right: 12,
@@ -756,7 +806,7 @@ class _DashboardState extends State<Dashboard> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    _error!,
+                    error,
                     style: const TextStyle(color: Ns.danger, fontSize: 12),
                   ),
                 ),
