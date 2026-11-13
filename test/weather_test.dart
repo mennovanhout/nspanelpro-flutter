@@ -183,12 +183,18 @@ void main() {
   testWidgets('style pro labels an hourly forecast with the hour', (
     tester,
   ) async {
+    // temperatures above 23, so no "12°" can pass for the hour 12 in
+    // whatever timezone the test runs (CI is UTC)
+    final forecast = [
+      for (final (i, f) in _forecast.indexed)
+        {...f, 'temperature': 31.0 + i, 'templow': null},
+    ];
     final fake = FakeHa({
       'weather.home': st('weather.home', 'cloudy', {
         'friendly_name': 'Home',
-        'temperature': 11.6,
+        'temperature': 30.0,
         'temperature_unit': '°C',
-        'forecast': _forecast,
+        'forecast': forecast,
       }),
     });
     final env = await _env(fake);
@@ -219,7 +225,7 @@ void main() {
       'forecast_type': 'hourly',
     });
     expect(tester.takeException(), isNull);
-    for (final f in _forecast) {
+    for (final f in forecast) {
       expect(find.text(hourOf(f)), findsOneWidget);
     }
     expect(find.text(day), findsNothing);
@@ -231,7 +237,7 @@ void main() {
       'style': 'pro',
     });
     expect(find.text(day), findsWidgets);
-    expect(find.text(hourOf(_forecast[1])), findsNothing);
+    expect(find.text(hourOf(forecast[1])), findsNothing);
 
     await tester.pumpWidget(const SizedBox());
     unawaited(env.conn.dispose());
