@@ -111,6 +111,7 @@ class _SetupScreenState extends State<SetupScreen> {
       language: widget.initial?.language ?? '',
       haLanguage: widget.initial?.haLanguage ?? '',
       returnAfter: widget.initial?.returnAfter ?? 0,
+      popupTimeout: widget.initial?.popupTimeout ?? 30,
     );
     s.save().then((_) => widget.onSaved(s));
   }

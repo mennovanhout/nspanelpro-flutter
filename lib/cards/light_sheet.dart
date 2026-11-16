@@ -60,6 +60,7 @@ class _LightSheetState extends State<LightSheet> with EchoMixin {
         accent: controls.accent(s),
         fromTop: false,
         showLevel: caps.brightness,
+        active: on,
         enabled: caps.available,
         step: widget.config.numOr('step', 5),
         actions: [

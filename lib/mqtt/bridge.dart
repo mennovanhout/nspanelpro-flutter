@@ -77,6 +77,7 @@ class PanelBridge {
     'text_size',
     'language',
     'return_after',
+    'popup_timeout',
   ];
 
   /// The language select's options, each in its own language so whoever
@@ -284,6 +285,16 @@ class PanelBridge {
         'mode': 'box',
         'unit_of_measurement': 's',
         'icon': 'mdi:keyboard-return',
+        ...conf,
+      }, command: true),
+      'number/$deviceId/popup_timeout': e('popup_timeout', {
+        'name': 'Close popups after',
+        'min': 0,
+        'max': Settings.maxPopupTimeout,
+        'step': 1,
+        'mode': 'box',
+        'unit_of_measurement': 's',
+        'icon': 'mdi:timer-outline',
         ...conf,
       }, command: true),
       'number/$deviceId/proximity_delta': e('proximity_delta', {

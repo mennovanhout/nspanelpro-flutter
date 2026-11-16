@@ -292,6 +292,10 @@ It is also on the setup screen, for a panel without MQTT, and `"text_size": 120`
 At 140% a card can need about 20 px more `height`. The screensaver has `clock_size` of its own
 and is left alone.
 
+**Close popups after.** The page a long-press opens closes itself after this many seconds
+without a touch (30 by default, 0 is never); a finger resting on the slider holds it open. Also
+`"popup_timeout": 30` in `setup.json`.
+
 **Return to dashboard after.** Seconds another app may have the screen before the dashboard
 comes back by itself; 0, the default, is never. It is for panels that keep Sonoff's launcher as
 home (see Start on boot), so a stray Home press does not leave the launcher's menu on the wall.
@@ -387,7 +391,7 @@ computer too; it has your token in it. A later file is a **partial** update — 
 it change — which is how you re-point a panel at a different dashboard, or adjust its
 screensaver, from your desk without re-entering the token. The full set of keys is `url`,
 `token`, `dashboard`, `name`, `mqtt`, `tts_engine`, `screensaver`, `feedback`, `brightness`,
-`text_size`, `language` and `return_after`.
+`text_size`, `language`, `return_after` and `popup_timeout`.
 
 ### Touch feedback
 
@@ -469,6 +473,7 @@ Give the app your MQTT broker and it registers itself through MQTT discovery: on
 | `number` Idle timeout, `switch` Sleep, `number` Sleep after, `number` Wake sensitivity | the screensaver's `after`, `sleep`, `sleep_after` and `proximity_delta`, changeable from HA (see Panel settings) |
 | `switch` Auto brightness, `number` minimum / maximum / daylight | the screen follows the light sensor (see Panel settings) |
 | `number` Text size | 80-140%, everything but the screensaver (see Panel settings) |
+| `number` Close popups after | seconds before a long-press page closes itself; 0 is never (see Panel settings) |
 | `number` Return to dashboard after | seconds before the app comes back in front of another app; 0 is never (see Panel settings) |
 | `select` Language | Home Assistant (follow it), English, Nederlands or Deutsch (see Panel settings) |
 | `button` Use dashboard settings | drops every override; the dashboard card is the config again |

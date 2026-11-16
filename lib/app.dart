@@ -30,6 +30,7 @@ import 'ui/pager.dart';
 import 'ui/display_overlay.dart';
 import 'ui/saver_weather.dart';
 import 'ui/setup_screen.dart';
+import 'ui/sheet.dart';
 import 'ui/theme.dart';
 import 'ui/warmup.dart';
 import 'update/updater.dart';
@@ -37,7 +38,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.9.2';
+const appVersion = '0.10.0';
 
 class NsPanelApp extends StatefulWidget {
   const NsPanelApp({super.key});
@@ -306,6 +307,7 @@ class _DashboardState extends State<Dashboard> {
       if (mounted) {
         // after the frame: it notifies [L], an ancestor of this build
         _applyLanguage();
+        _applyPopupTimeout();
         _configureDisplay();
         _displayChanged();
       }
@@ -489,12 +491,19 @@ class _DashboardState extends State<Dashboard> {
     b.setting('text_size', st.textSize.toString());
     b.setting('language', PanelBridge.languageOption(st.language));
     b.setting('return_after', st.returnAfter.toString());
+    b.setting('popup_timeout', st.popupTimeout.toString());
   }
 
   // ---- language --------------------------------------------------------------
 
   Future<void> Function()? _unsubLanguage;
   int _languageGen = -1;
+
+  /// A long-press page untouched this long closes itself; 0 never does.
+  void _applyPopupTimeout() {
+    final s = widget.settings.popupTimeout;
+    Sheets.autoClose = s > 0 ? Duration(seconds: s) : null;
+  }
 
   /// The panel setting, else HA's, else English - drawn at once.
   void _applyLanguage() {
@@ -535,6 +544,9 @@ class _DashboardState extends State<Dashboard> {
         st.overrides = {...?st.overrides, 'proximity_delta': n.toDouble()};
       case 'text_size' when n != null:
         st.textSize = n.round();
+      case 'popup_timeout' when n != null:
+        st.popupTimeout = n.round();
+        _applyPopupTimeout();
       case 'return_after' when n != null:
         st.returnAfter = n.round();
         _returner.seconds = st.returnAfter;

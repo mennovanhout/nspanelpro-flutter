@@ -74,6 +74,7 @@ class _SwitchSheetState extends State<SwitchSheet> {
         value: 0,
         accent: parseHex(widget.config.str('accent')) ?? Ns.amber,
         showLevel: false,
+        active: on,
         enabled: available && !_busy,
         fromTop: false,
         step: 5,

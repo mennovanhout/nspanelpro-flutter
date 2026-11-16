@@ -26,9 +26,11 @@ class Settings {
     this.language = '',
     this.haLanguage = '',
     int returnAfter = 0,
+    int popupTimeout = 30,
   }) {
     this.textSize = textSize;
     this.returnAfter = returnAfter;
+    this.popupTimeout = popupTimeout;
   }
 
   String url;
@@ -118,6 +120,12 @@ class Settings {
   int _returnAfter = 0;
   static const maxReturnAfter = 3600;
 
+  /// Seconds untouched before a long-press page closes itself; 0 is never.
+  int get popupTimeout => _popupTimeout;
+  set popupTimeout(int v) => _popupTimeout = v.clamp(0, maxPopupTimeout);
+  int _popupTimeout = 30;
+  static const maxPopupTimeout = 600;
+
   /// Lovelace url_path of the dashboard to render; empty = the default one.
   String dashboard;
 
@@ -140,6 +148,7 @@ class Settings {
   static const _kLanguage = 'language';
   static const _kHaLanguage = 'ha_language';
   static const _kReturnAfter = 'return_after';
+  static const _kPopupTimeout = 'popup_timeout';
 
   /// `nl`, `NL`, `nl-BE` -> `nl`; `auto`, empty, or a language the panel
   /// does not speak -> empty, which follows Home Assistant.
@@ -220,6 +229,9 @@ class Settings {
         returnAfter: (j['return_after'] as num?)?.toInt() ??
             current?.returnAfter ??
             0,
+        popupTimeout: (j['popup_timeout'] as num?)?.toInt() ??
+            current?.popupTimeout ??
+            30,
       );
       await s.save();
       return true;
@@ -252,6 +264,7 @@ class Settings {
       language: p.getString(_kLanguage) ?? '',
       haLanguage: p.getString(_kHaLanguage) ?? '',
       returnAfter: p.getInt(_kReturnAfter) ?? 0,
+      popupTimeout: p.getInt(_kPopupTimeout) ?? 30,
     );
   }
 
@@ -266,6 +279,7 @@ class Settings {
     await p.setString(_kLanguage, language);
     await p.setString(_kHaLanguage, haLanguage);
     await p.setInt(_kReturnAfter, returnAfter);
+    await p.setInt(_kPopupTimeout, popupTimeout);
     final maps = {
       _kSaver: screensaver,
       _kMqtt: mqtt,
@@ -301,6 +315,7 @@ class Settings {
     await p.remove(_kLanguage);
     await p.remove(_kHaLanguage);
     await p.remove(_kReturnAfter);
+    await p.remove(_kPopupTimeout);
     await p.remove(_kTts);
     await p.remove(_kOverrides);
     await p.remove(_kBrightness);
