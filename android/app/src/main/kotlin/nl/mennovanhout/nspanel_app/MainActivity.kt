@@ -1,6 +1,7 @@
 package nl.mennovanhout.nspanel_app
 
 import android.content.BroadcastReceiver
+import android.app.ActivityManager
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Handler
@@ -323,6 +324,19 @@ class MainActivity : FlutterActivity() {
                 // system permissions: a bright wake lock flagged to cause the
                 // wake-up. Deprecated since API 17, still what the framework
                 // honours on 27, and this panel is 27.
+                // Back in front of whatever took the screen (the stock launcher's
+                // menu after a stray Home press). Android 8.1 lets a background
+                // app do this; the start-from-background rules came with 10.
+                "bringToFront" -> {
+                    try {
+                        val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+                        am.moveTaskToFront(taskId, 0)
+                    } catch (e: Exception) {
+                        startActivity(Intent(this, MainActivity::class.java)
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+                    }
+                    result.success(true)
+                }
                 "wakeScreen" -> {
                     val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
                     @Suppress("DEPRECATION")

@@ -17,6 +17,7 @@ import 'util/device.dart';
 import 'util/display_session.dart';
 import 'util/text_scale.dart';
 import 'util/frames.dart';
+import 'util/return_to_front.dart';
 import 'config/dashboard.dart';
 import 'config/screensaver.dart';
 import 'config/settings.dart';
@@ -36,7 +37,7 @@ import 'util/proximity.dart';
 
 /// Reported to Home Assistant as the device's sw_version. Keep in step with
 /// pubspec.yaml.
-const appVersion = '0.9.1';
+const appVersion = '0.9.2';
 
 class NsPanelApp extends StatefulWidget {
   const NsPanelApp({super.key});
@@ -232,6 +233,11 @@ class _DashboardState extends State<Dashboard> {
     widget.display.configure(s, active: true);
   }
 
+  late final _returner = ReturnToFront(bringToFront: () {
+    debugPrint('display: another app had the screen, coming back');
+    return Device.bringToFront();
+  })..seconds = widget.settings.returnAfter;
+
   int _lastTouchSerial = 0;
   void _displayChanged() {
     final serial = widget.display.controller.touchSerial;
@@ -240,6 +246,7 @@ class _DashboardState extends State<Dashboard> {
       _bridge?.touched();
     }
     _awake.value = !_saving && widget.display.controller.interactive;
+    _returner.foreground = widget.display.controller.foreground;
     _bridge?.screensaver(_saving);
   }
 
@@ -319,7 +326,7 @@ class _DashboardState extends State<Dashboard> {
   late final Announcer _announcer;
   PanelBridge? _bridge;
   MqttClient? _mqtt;
-  final _pageJump = ValueNotifier<int>(0);
+  final _pageJump = PageJump();
   StreamSubscription<double>? _proxAlways, _lightSub;
   Timer? _diag;
   Timer? _updateCheck;
@@ -362,7 +369,7 @@ class _DashboardState extends State<Dashboard> {
       },
       onScreensaver: (on) =>
           on ? widget.display.controller.sleep(force: true) : _wake(),
-      onPage: (i) => _pageJump.value = i,
+      onPage: _pageJump.go,
       onSay: _announcer.say,
       onPlay: _announcer.play,
       onStop: _announcer.stop,
@@ -481,6 +488,7 @@ class _DashboardState extends State<Dashboard> {
     b.setting('brightness_daylight', st.brightnessDaylight.round().toString());
     b.setting('text_size', st.textSize.toString());
     b.setting('language', PanelBridge.languageOption(st.language));
+    b.setting('return_after', st.returnAfter.toString());
   }
 
   // ---- language --------------------------------------------------------------
@@ -527,6 +535,9 @@ class _DashboardState extends State<Dashboard> {
         st.overrides = {...?st.overrides, 'proximity_delta': n.toDouble()};
       case 'text_size' when n != null:
         st.textSize = n.round();
+      case 'return_after' when n != null:
+        st.returnAfter = n.round();
+        _returner.seconds = st.returnAfter;
       case 'language':
         final code = PanelBridge.languageCode(value);
         if (code == null) return;
@@ -601,6 +612,7 @@ class _DashboardState extends State<Dashboard> {
     _mqtt?.dispose();
     _announcer.dispose();
     _pageJump.dispose();
+    _returner.dispose();
     widget.display.controller.removeListener(_displayChanged);
     _conn.status.removeListener(_onStatus);
     _unsubLovelace?.call();

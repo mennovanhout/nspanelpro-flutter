@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
     <!-- come back up after a power cut, and after updating itself -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- return_after: back in front of the stock launcher after a stray Home press -->
+    <uses-permission android:name="android.permission.REORDER_TASKS"/>
     <!-- touch feedback -->
     <uses-permission android:name="android.permission.VIBRATE"/>
     <application

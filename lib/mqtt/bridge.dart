@@ -76,6 +76,7 @@ class PanelBridge {
     'brightness_daylight',
     'text_size',
     'language',
+    'return_after',
   ];
 
   /// The language select's options, each in its own language so whoever
@@ -273,6 +274,16 @@ class PanelBridge {
         'name': 'Language',
         'options': languageOptions.values.toList(),
         'icon': 'mdi:translate',
+        ...conf,
+      }, command: true),
+      'number/$deviceId/return_after': e('return_after', {
+        'name': 'Return to dashboard after',
+        'min': 0,
+        'max': Settings.maxReturnAfter,
+        'step': 1,
+        'mode': 'box',
+        'unit_of_measurement': 's',
+        'icon': 'mdi:keyboard-return',
         ...conf,
       }, command: true),
       'number/$deviceId/proximity_delta': e('proximity_delta', {

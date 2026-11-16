@@ -2,6 +2,19 @@ import 'package:flutter/material.dart';
 
 import 'theme.dart';
 
+/// How HA turns the page: every [go] is heard, even for the page it asked
+/// for last time. A `ValueNotifier<int>` was not - after a swipe by hand, "page
+/// 0" again was no change to it, so the panel stayed where it was.
+class PageJump extends ChangeNotifier {
+  int _page = 0;
+  int get page => _page;
+
+  void go(int page) {
+    _page = page;
+    notifyListeners();
+  }
+}
+
 /// Pages side by side, swiped. PageView's horizontal recognizer and the
 /// cards' vertical one settle it in the gesture arena, which is the same
 /// axis-lock the web cards do by hand.
@@ -20,8 +33,8 @@ class PanelPager extends StatefulWidget {
   final bool showDots;
   final int initialPage;
 
-  /// Set a page index here and the pager goes there - how HA turns the page.
-  final ValueNotifier<int>? jump;
+  /// [PageJump.go] and the pager goes there - how HA turns the page.
+  final PageJump? jump;
   final ValueChanged<int>? onPage;
 
   @override
@@ -54,7 +67,7 @@ class _PanelPagerState extends State<PanelPager> {
   }
 
   void _onJump() {
-    final i = widget.jump!.value.clamp(0, widget.pages.length - 1);
+    final i = widget.jump!.page.clamp(0, widget.pages.length - 1);
     if (!_controller.hasClients || i == _index) return;
     _controller.animateToPage(
       i,

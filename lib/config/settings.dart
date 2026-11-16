@@ -25,8 +25,10 @@ class Settings {
     int textSize = 100,
     this.language = '',
     this.haLanguage = '',
+    int returnAfter = 0,
   }) {
     this.textSize = textSize;
+    this.returnAfter = returnAfter;
   }
 
   String url;
@@ -109,6 +111,13 @@ class Settings {
   /// The language to draw in now: the panel's own, else HA's, else English.
   Lang get lang => langFromCode(language) ?? langFromCode(haLanguage) ?? Lang.en;
 
+  /// Seconds another app may have the screen before this one comes back in
+  /// front; 0 is never. Panel-only, like the text size.
+  int get returnAfter => _returnAfter;
+  set returnAfter(int v) => _returnAfter = v.clamp(0, maxReturnAfter);
+  int _returnAfter = 0;
+  static const maxReturnAfter = 3600;
+
   /// Lovelace url_path of the dashboard to render; empty = the default one.
   String dashboard;
 
@@ -130,6 +139,7 @@ class Settings {
   static const _kTextSize = 'text_size';
   static const _kLanguage = 'language';
   static const _kHaLanguage = 'ha_language';
+  static const _kReturnAfter = 'return_after';
 
   /// `nl`, `NL`, `nl-BE` -> `nl`; `auto`, empty, or a language the panel
   /// does not speak -> empty, which follows Home Assistant.
@@ -207,6 +217,9 @@ class Settings {
             ? _languageSetting(j['language']?.toString())
             : current?.language ?? '',
         haLanguage: current?.haLanguage ?? '',
+        returnAfter: (j['return_after'] as num?)?.toInt() ??
+            current?.returnAfter ??
+            0,
       );
       await s.save();
       return true;
@@ -238,6 +251,7 @@ class Settings {
       textSize: p.getInt(_kTextSize) ?? 100,
       language: p.getString(_kLanguage) ?? '',
       haLanguage: p.getString(_kHaLanguage) ?? '',
+      returnAfter: p.getInt(_kReturnAfter) ?? 0,
     );
   }
 
@@ -251,6 +265,7 @@ class Settings {
     await p.setInt(_kTextSize, textSize);
     await p.setString(_kLanguage, language);
     await p.setString(_kHaLanguage, haLanguage);
+    await p.setInt(_kReturnAfter, returnAfter);
     final maps = {
       _kSaver: screensaver,
       _kMqtt: mqtt,
@@ -285,6 +300,7 @@ class Settings {
     await p.remove(_kTextSize);
     await p.remove(_kLanguage);
     await p.remove(_kHaLanguage);
+    await p.remove(_kReturnAfter);
     await p.remove(_kTts);
     await p.remove(_kOverrides);
     await p.remove(_kBrightness);

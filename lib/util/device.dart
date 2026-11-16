@@ -104,6 +104,15 @@ class Device {
     }
   }
 
+  /// Puts the app back in front of whichever app took the screen.
+  static Future<void> bringToFront() async {
+    try {
+      await _m.invokeMethod<bool>('bringToFront');
+    } catch (_) {
+      // not Android
+    }
+  }
+
   /// Keeps the SoC running while the display sleeps, so the proximity sensor
   /// and the MQTT socket stay alive in the dark.
   static Future<void> holdCpu(bool on) async {
