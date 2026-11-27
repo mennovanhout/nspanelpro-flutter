@@ -108,10 +108,12 @@ as the nspanel weather card: `entity`, `name`, `show_forecast`, `forecast_type` 
 
 The camera card is a doorbell or a driveway as a still, asked for at the card's own size and
 replaced about once a second - and only while its page is the one showing and the
-screensaver is not up, so a camera on its own page costs nothing the rest of the time. No
-video decoder runs on this hardware; Home Assistant scales the still. With the **Screensaver**
-switch and the **Page** number of the panel's device, a doorbell automation can wake the
-panel, turn to the camera page and ring - the cards README has the automation.
+screensaver is not up, so a camera on its own page costs nothing the rest of the time. Home
+Assistant scales the still. Native-only: `live: true` opens HA's HLS stream (with audio)
+instead, still only while on screen; `muted: true` silences it. A browser ignores those
+keys and keeps drawing stills. With the **Screensaver** switch and the **Page** number of
+the panel's device, a doorbell automation can wake the panel, turn to the camera page and
+ring - the cards README has the automation.
 
 `style: pro` on `custom:nspanel-weather-card` draws a full-screen weather page: a big
 temperature over a gradient per condition, with the forecast along the bottom. It is native

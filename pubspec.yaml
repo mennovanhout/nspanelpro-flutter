@@ -39,6 +39,7 @@ dependencies:
     path: vendor/material_design_icons_flutter
   path_provider: ^2.1.6
   just_audio: ^0.10.6
+  video_player: ^2.10.0
 
 dev_dependencies:
   crypto: ^3.0.0
