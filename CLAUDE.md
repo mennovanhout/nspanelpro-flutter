@@ -55,9 +55,9 @@ sounds, TTS through HA, self-update from GitHub Releases, start on boot.
   brightness (`Settings.brightness`) is panel-only, never in the dashboard: it is hardware.
 - **A card that fetches only does so while it is on screen.** `PageScope` (`lib/ui/page_scope.dart`)
   wraps every page with its index, the shown page and whether the dashboard is visible; the
-  camera card polls stills only while `active`. The warm-up's hidden copies are index -1 and
-  never active. No stream, no decoder: one scaled JPEG per `interval`, the next asked for
-  after the last arrived.
+  camera card polls stills only while `active` (or, with native-only `live: true`, holds an
+  HLS player only while `active`). The warm-up's hidden copies are index -1 and never
+  active. Default: one scaled JPEG per `interval`, the next asked for after the last arrived.
 - **HA's own `weather-forecast` card is drawn as ours** (`weatherConfigFromHa` in
   `lib/util/weather.dart`, wired in the registry). Its options that mean the same thing map
   across; keep that mapping when the weather card gains options.
@@ -66,7 +66,8 @@ sounds, TTS through HA, self-update from GitHub Releases, start on boot.
   stay supported: simple-swipe-card dashboards must keep working unchanged.
 - **Card options are the cards repo's.** When adding an option here, add it to the cards repo
   (default literal, README row, editor schema) or document it as native-only in both READMEs.
-  Native-only today: `sounds` and `haptics` on the alarm card.
+  Native-only today: `sounds` and `haptics` on the alarm card; `live` and `muted` on the
+  camera card.
 - **A gray card on the panel is an exception in that card's build or layout.** Release builds
   draw a throwing widget as a plain gray box and log nothing visible. Reproduce it in a widget
   test inside a `Column`, as a page is, and assert `tester.takeException()` is null (see
